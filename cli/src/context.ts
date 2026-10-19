@@ -1,6 +1,6 @@
 import { NotLoggedInError, getAccessToken } from "./access.ts";
 import { AccessDeniedError, BaoError, connect, type BaoClient } from "./bao.ts";
-import { findProject, readUserConfig, userConfigPath, type Project } from "./config.ts";
+import { findProject, readUserConfig, userConfigPath, validateEnvName, type Project } from "./config.ts";
 import { UnrepresentableValueError } from "./dotenv.ts";
 import type { Io } from "./io.ts";
 
@@ -35,8 +35,34 @@ export async function loadContext(io: Io): Promise<Context> {
   return { ...base, project };
 }
 
-export const noSecretsMessage = (project: string) =>
-  `No secrets stored for project ${project}. Run \`secrets push\` first.`;
+export function noSecretsMessage(project: Project, env: string): string {
+  const push = env === project.defaultEnv ? "secrets push" : `secrets push --env ${env}`;
+  return `No secrets stored for project ${project.name} (${env}). Run \`${push}\` first.`;
+}
+
+/** Removes `--env X` / `--env=X` from args (callers pass only the part before `--`). */
+export function takeEnvFlag(args: string[]): { env: string | undefined; rest: string[] } {
+  let env: string | undefined;
+  const rest: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    let value: string | undefined;
+    if (a === "--env") value = args[++i] ?? "";
+    else if (a.startsWith("--env=")) value = a.slice("--env=".length);
+    else {
+      rest.push(a);
+      continue;
+    }
+    if (!value) throw new UsageError("--env needs a value");
+    if (!validateEnvName(value)) throw new UsageError(`Invalid environment name: ${value}`);
+    env = value;
+  }
+  return { env, rest };
+}
+
+export function resolveEnv(flag: string | undefined, project: Project): string {
+  return flag ?? project.defaultEnv;
+}
 
 /** Maps thrown errors to exit codes: usage -> 2 (with hint), everything else -> 1. */
 export async function guarded(io: Io, usage: string, fn: () => Promise<number>): Promise<number> {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findProject, normalizeServer, readUserConfig, userConfigPath, validateProjectName, writeUserConfig } from "../src/config.ts";
+import { devVarsFileFor, findProject, normalizeServer, readUserConfig, userConfigPath, validateEnvName, validateProjectName, writeUserConfig } from "../src/config.ts";
 
 let dir: string;
 beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), "secrets-cfg-")); });
@@ -11,7 +11,7 @@ afterEach(() => rm(dir, { recursive: true, force: true }));
 test("finds .secrets.json in a parent dir", async () => {
   await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "my-app" }));
   await mkdir(join(dir, "a", "b"), { recursive: true });
-  expect(await findProject(join(dir, "a", "b"))).toEqual({ name: "my-app", root: dir });
+  expect(await findProject(join(dir, "a", "b"))).toEqual({ name: "my-app", root: dir, defaultEnv: "dev" });
 });
 test("returns null when no project file exists", async () => {
   expect(await findProject(dir)).toBeNull();
@@ -47,4 +47,30 @@ test("writeUserConfig creates the file with mode 0600 and round-trips", async ()
   await writeUserConfig({ server: "https://bao.example.com" }, p);
   expect((await stat(p)).mode & 0o777).toBe(0o600);
   expect(await readUserConfig(p)).toEqual({ server: "https://bao.example.com" });
+});
+
+test("defaultEnv defaults to dev", async () => {
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "p" }));
+  expect((await findProject(dir))?.defaultEnv).toBe("dev");
+});
+test("defaultEnv is read from .secrets.json", async () => {
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "p", defaultEnv: "local" }));
+  expect((await findProject(dir))?.defaultEnv).toBe("local");
+});
+test("invalid defaultEnv throws naming the file", async () => {
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "p", defaultEnv: "Staging!" }));
+  await expect(findProject(dir)).rejects.toThrow(".secrets.json");
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "p", defaultEnv: 3 }));
+  await expect(findProject(dir)).rejects.toThrow(".secrets.json");
+});
+test("accepts valid env names", () => {
+  for (const n of ["dev", "staging", "pr-12", "a_b", "x".repeat(32)]) expect(validateEnvName(n)).toBe(true);
+});
+test.each(["", "Dev", "a/b", "-x", "x".repeat(33)])("rejects env %p", (n) => expect(validateEnvName(n)).toBe(false));
+test("devVarsFileFor maps the default env to .dev.vars", () => {
+  const p = { name: "p", root: "/r", defaultEnv: "dev" };
+  expect(devVarsFileFor(p, "dev")).toBe("/r/.dev.vars");
+  expect(devVarsFileFor(p, "staging")).toBe("/r/.dev.vars.staging");
+  expect(devVarsFileFor({ ...p, defaultEnv: "local" }, "local")).toBe("/r/.dev.vars");
+  expect(devVarsFileFor({ ...p, defaultEnv: "local" }, "dev")).toBe("/r/.dev.vars.dev");
 });

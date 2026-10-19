@@ -16,7 +16,7 @@ export function pull(args: string[], io: Io): Promise<number> {
     const ctx = await loadContext(io);
     const secret = await (await ctx.client()).readSecret(ctx.project.name);
     if (secret === null) {
-      io.err(`${noSecretsMessage(ctx.project.name)}\n`);
+      io.err(`${noSecretsMessage(ctx.project, ctx.project.defaultEnv)}\n`);
       return 1;
     }
     const path = join(ctx.project.root, ".dev.vars");

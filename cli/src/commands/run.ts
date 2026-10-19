@@ -25,7 +25,7 @@ export function run(args: string[], io: Io): Promise<number> {
     }
     const secret = await (await ctx.client()).readSecret(ctx.project.name);
     if (secret === null) {
-      io.err(`${noSecretsMessage(ctx.project.name)}\n`);
+      io.err(`${noSecretsMessage(ctx.project, ctx.project.defaultEnv)}\n`);
       return 1;
     }
     return spawnWithSignals(cmd, buildChildEnv(io.env, secret), io.cwd);

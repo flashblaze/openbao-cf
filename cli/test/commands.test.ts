@@ -105,14 +105,14 @@ test("run on an empty project explains", async () => {
   await setup([LOGIN, NOT_FOUND]);
   const code = await run(["--", "sh", "-c", "echo hi > out"], io);
   expect(code).toBe(1);
-  expect(errBuf).toContain("No secrets stored for project demo. Run `secrets push` first.");
+  expect(errBuf).toContain("No secrets stored for project demo (dev). Run `secrets push` first.");
   expect(await exists(join(dir, "out"))).toBe(false);
 });
 
 test("pull on an empty project explains", async () => {
   await setup([LOGIN, NOT_FOUND]);
   expect(await pull([], io)).toBe(1);
-  expect(errBuf).toContain("No secrets stored for project demo. Run `secrets push` first.");
+  expect(errBuf).toContain("No secrets stored for project demo (dev). Run `secrets push` first.");
   expect(await exists(join(dir, ".dev.vars"))).toBe(false);
 });
 
