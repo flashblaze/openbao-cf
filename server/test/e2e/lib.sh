@@ -1,7 +1,9 @@
 # Shared helpers for e2e scripts. Source from the server/ directory.
 command -v bao >/dev/null 2>&1 || PATH="$(dirname "$(mise which bao)"):$PATH"
+SERVER_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 TMP=$(mktemp -d)
 cleanup() {
+  cd "$SERVER_DIR" || true
   docker compose --profile restore down -v >/dev/null 2>&1 || true
   rm -rf "$TMP"
 }
@@ -16,7 +18,7 @@ wait_health() {
   while :; do
     got=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/v1/sys/health" || true)
     [ "$got" = "$want" ] && break
-    [ $((SECONDS - t0)) -lt "$cap" ] || { docker compose logs openbao | tail -30; fail "port $port health never reached $want in ${cap}s"; }
+    [ $((SECONDS - t0)) -lt "$cap" ] || { (cd "$SERVER_DIR" && docker compose logs openbao | tail -30); fail "port $port health never reached $want in ${cap}s"; }
     sleep 1
   done
   echo "health $want on :$port after $((SECONDS - t0))s"
