@@ -3,40 +3,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-command -v bao >/dev/null 2>&1 || PATH="$(dirname "$(mise which bao)"):$PATH"
-TMP=$(mktemp -d)
-cleanup() { docker compose down -v >/dev/null 2>&1 || true; rm -rf "$TMP"; }
-trap cleanup EXIT
+source test/e2e/lib.sh
 
-export BAO_ADDR=http://127.0.0.1:8200
-export BAO_SEAL_KEY
-BAO_SEAL_KEY=$(openssl rand -hex 32)
-fail() { echo "FAIL: $*" >&2; exit 1; }
-health() { curl -s -o /dev/null -w '%{http_code}' "$BAO_ADDR/v1/sys/health" || true; }
-wait_health() { # code, cap seconds
-  local want=$1 cap=$2 t0=$SECONDS
-  until [ "$(health)" = "$want" ]; do
-    [ $((SECONDS - t0)) -lt "$cap" ] || { docker compose logs openbao | tail -30; fail "health never reached $want in ${cap}s"; }
-    sleep 1
-  done
-  echo "health $want after $((SECONDS - t0))s"
-}
-
-echo "== 1. up"
-docker compose up -d --build --wait postgres openbao
-echo "== 2. wait for 501 (uninitialized)"
-wait_health 501 180
-
-echo "== 3. init"
-ROOT=$(bash scripts/init.sh | jq -r .root_token)
-[ -n "$ROOT" ] && [ "$ROOT" != null ] || fail "empty root token"
-
-echo "== 4. configure (twice)"
-bun test/e2e/jwt.ts keygen "$TMP"
-for i in 1 2; do
-  BAO_TOKEN=$ROOT JWT_PUBKEY_FILE="$TMP/public.pem" JWT_ISSUER=https://test.cloudflareaccess.com \
-    ACCESS_AUD=test-aud OWNER_EMAIL=owner@example.com bash scripts/configure.sh >/dev/null
-done
+stack_up
+init_and_configure
 
 echo "== 5. owner login"
 login() {
@@ -60,7 +30,7 @@ echo "rejected with $CODE"
 
 echo "== 8. restart, auto-unseal"
 docker compose restart openbao
-wait_health 200 180
+wait_health 8200 200 180
 [ "$(read_demo)" = abc ] || fail "kv read after restart mismatch"
 
 echo "== 9. logs and memory"
