@@ -3,6 +3,14 @@ import { dirname, join } from "node:path";
 import { APP_NAME, DEFAULT_ENV, PROJECT_FILE } from "./name.ts";
 
 export type UserConfig = { server: string };
+
+/** A problem with the project's .secrets.json (reported as a usage error). */
+export class ProjectConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProjectConfigError";
+  }
+}
 export type Project = { name: string; root: string; defaultEnv: string };
 
 export function userConfigPath(env: Record<string, string | undefined>): string {
@@ -63,15 +71,17 @@ export async function findProject(startDir: string): Promise<Project | null> {
       try {
         parsed = JSON.parse(text);
       } catch {
-        throw new Error(`${file} is not valid JSON`);
+        throw new ProjectConfigError(`${file} is not valid JSON`);
       }
       const name = parsed?.project;
       if (typeof name !== "string" || !validateProjectName(name)) {
-        throw new Error(`${file} has an invalid "project" name (use lowercase letters, digits, "-" and "_", up to 64 chars)`);
+        throw new ProjectConfigError(`${file} has an invalid "project" name (use lowercase letters, digits, "-" and "_", up to 64 chars)`);
       }
       const defaultEnv = parsed?.defaultEnv ?? DEFAULT_ENV;
       if (typeof defaultEnv !== "string" || !validateEnvName(defaultEnv)) {
-        throw new Error(`${file} has an invalid "defaultEnv" (use lowercase letters, digits, "-" and "_", up to 32 chars)`);
+        throw new ProjectConfigError(
+          `${file} has an invalid "defaultEnv": ${JSON.stringify(defaultEnv)} (use lowercase letters, digits, "-" and "_", up to 32 chars)`,
+        );
       }
       return { name, root: dir, defaultEnv };
     }

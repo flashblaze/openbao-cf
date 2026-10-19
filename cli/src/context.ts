@@ -1,6 +1,6 @@
 import { NotLoggedInError, getAccessToken } from "./access.ts";
 import { AccessDeniedError, BaoError, connect, type BaoClient } from "./bao.ts";
-import { findProject, readUserConfig, userConfigPath, validateEnvName, type Project } from "./config.ts";
+import { ProjectConfigError, findProject, readUserConfig, userConfigPath, validateEnvName, type Project } from "./config.ts";
 import { UnrepresentableValueError } from "./dotenv.ts";
 import type { Io } from "./io.ts";
 
@@ -30,7 +30,13 @@ export async function loadServerContext(io: Io): Promise<ServerContext> {
 
 export async function loadContext(io: Io): Promise<Context> {
   const base = await loadServerContext(io);
-  const project = await findProject(io.cwd);
+  let project: Project | null;
+  try {
+    project = await findProject(io.cwd);
+  } catch (e) {
+    if (e instanceof ProjectConfigError) throw new UsageError(e.message);
+    throw e;
+  }
   if (!project) throw new UsageError("No .secrets.json found in this directory or any parent.");
   return { ...base, project };
 }
@@ -43,10 +49,14 @@ export function noSecretsMessage(project: Project, env: string): string {
 export const legacyHint = (project: string) =>
   `Found secrets for ${project} stored before environments existed. Run \`secrets migrate\` to move them into the default environment.`;
 
+/** True when `env` is the default and pre-environment data still sits at secret/<project>. */
+export async function legacyPending(client: BaoClient, project: Project, env: string): Promise<boolean> {
+  return env === project.defaultEnv && (await client.readLegacy(project.name)) !== null;
+}
+
 /** Message for an empty env: points to `secrets migrate` when only pre-environment data exists. */
 export async function missingSecretsMessage(client: BaoClient, project: Project, env: string): Promise<string> {
-  if (env === project.defaultEnv && (await client.readLegacy(project.name)) !== null) return legacyHint(project.name);
-  return noSecretsMessage(project, env);
+  return (await legacyPending(client, project, env)) ? legacyHint(project.name) : noSecretsMessage(project, env);
 }
 
 /** Removes `--env X` / `--env=X` from args (callers pass only the part before `--`). */

@@ -32,7 +32,8 @@ secrets envs            # list environments (* = default, "dev" unless .secrets.
 
 - `run` refuses while any `.dev.vars` or `.dev.vars.<env>` exists, because Wrangler then ignores injected env.
 - After upgrading to a CLI with environments, run `secrets migrate` once in any project pushed before then.
-  It moves `secret/<project>` to `secret/<project>/dev`; `run` and `pull` point you to it.
+  It moves `secret/<project>` into the project's default environment (`secret/<project>/dev` unless
+  `.secrets.json` sets `defaultEnv`). `run`, `pull`, `push` and `envs` point you to it.
 - The first command after a quiet spell wakes the container: expect about 10 s.
 - Web UI: `https://bao.flashblaze.dev/ui` → method **OIDC**, role blank → **Sign in** (GitHub popup).
 
@@ -121,7 +122,7 @@ read -rsp 'Seal key: ' K && echo && BAO_SEAL_KEY=$K bash scripts/restore-drill.s
 # Restored OpenBao is at http://127.0.0.1:8201 with production config. Log in with your Access token:
 J=$(cf access token https://bao.flashblaze.dev)
 T=$(curl -s -X POST -d "{\"role\":\"owner\",\"jwt\":\"$J\"}" http://127.0.0.1:8201/v1/auth/jwt/login | jq -r .auth.client_token)
-curl -s -H "X-Vault-Token: $T" http://127.0.0.1:8201/v1/secret/data/<project> | jq '.data.data | keys'
+curl -s -H "X-Vault-Token: $T" http://127.0.0.1:8201/v1/secret/data/<project>/<env> | jq '.data.data | keys'
 BAO_SEAL_KEY=unused docker compose --profile restore down -v && rm /tmp/b.ndjson
 ```
 

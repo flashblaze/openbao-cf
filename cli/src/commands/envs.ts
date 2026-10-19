@@ -9,12 +9,11 @@ export function envs(args: string[], io: Io): Promise<number> {
     const ctx = await loadContext(io);
     const client = await ctx.client();
     const names = await client.listEnvs(ctx.project.name);
-    if (names.length === 0) {
-      io.out(`No environments for project ${ctx.project.name}.\n`);
-      if ((await client.readLegacy(ctx.project.name)) !== null) io.err(`${legacyHint(ctx.project.name)}\n`);
-      return 0;
-    }
+    if (names.length === 0) io.out(`No environments for project ${ctx.project.name}.\n`);
     for (const n of names) io.out(`${n === ctx.project.defaultEnv ? "* " : "  "}${n}\n`);
+    if (!names.includes(ctx.project.defaultEnv) && (await client.readLegacy(ctx.project.name)) !== null) {
+      io.err(`${legacyHint(ctx.project.name)}\n`);
+    }
     return 0;
   });
 }

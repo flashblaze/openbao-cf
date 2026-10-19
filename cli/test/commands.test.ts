@@ -283,6 +283,37 @@ test("migrate output names keys, never values", async () => {
   }
 });
 
+test("push to the default env refuses while only legacy data exists", async () => {
+  await setup([LOGIN, NOT_FOUND, READ]);
+  await writeFile(join(dir, ".dev.vars"), "A=1\n");
+  expect(await push(["--yes"], io)).toBe(1);
+  expect(errBuf).toBe(`${legacyHint("demo")}\n`);
+  expect(writes().length).toBe(0);
+});
+
+test("push to a non-default env ignores legacy data", async () => {
+  await setup([LOGIN, NOT_FOUND, OK]);
+  await writeFile(join(dir, ".dev.vars.qa"), "A=1\n");
+  expect(await push(["--env", "qa", "--yes"], io)).toBe(0);
+  expect(writes()[0].path).toBe("/v1/secret/data/demo/qa");
+});
+
+test("invalid defaultEnv is a usage error naming the value", async () => {
+  await setup([LOGIN, READ]);
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "demo", defaultEnv: "Staging!" }));
+  expect(await run(["--", "true"], io)).toBe(2);
+  expect(errBuf).toContain('"Staging!"');
+  expect(errBuf).toContain(".secrets.json");
+  expect(fake.requests.length).toBe(0);
+});
+
+test("envs shows the legacy hint when the default env is missing", async () => {
+  await setup([LOGIN, LIST(["staging"]), READ]);
+  expect(await envs([], io)).toBe(0);
+  expect(outBuf).toBe("  staging\n");
+  expect(errBuf).toBe(`${legacyHint("demo")}\n`);
+});
+
 test("pull refuses to overwrite without --force", async () => {
   await setup([LOGIN, READ, LOGIN, READ]);
   expect(await pull([], io)).toBe(0);

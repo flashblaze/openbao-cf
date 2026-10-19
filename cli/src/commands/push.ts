@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { devVarsFileFor } from "../config.ts";
-import { UsageError, guarded, loadContext, resolveEnv, takeEnvFlag } from "../context.ts";
+import { UsageError, guarded, legacyHint, legacyPending, loadContext, resolveEnv, takeEnvFlag } from "../context.ts";
 import { diffKeys, formatDiff, isEmptyDiff } from "../diff.ts";
 import { parseDevVars } from "../dotenv.ts";
 import type { Io } from "../io.ts";
@@ -34,7 +34,13 @@ export function push(args: string[], io: Io): Promise<number> {
     }
     const parsed = parseDevVars(text);
     const client = await ctx.client();
-    const current = (await client.readSecret(ctx.project.name, env)) ?? {};
+    const stored = await client.readSecret(ctx.project.name, env);
+    // Pushing over an empty default env would hide pre-environment data from the CLI.
+    if (stored === null && (await legacyPending(client, ctx.project, env))) {
+      io.err(`${legacyHint(ctx.project.name)}\n`);
+      return 1;
+    }
+    const current = stored ?? {};
     const diff = diffKeys(current, parsed);
     if (isEmptyDiff(diff)) {
       io.out("Nothing to change.\n");
