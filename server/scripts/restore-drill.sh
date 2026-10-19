@@ -17,6 +17,7 @@ docker compose --profile restore up -d --build openbao-restore
 for _ in $(seq 1 180); do
   [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8201/v1/sys/health || true)" = 200 ] && {
     echo "Restored OpenBao at http://127.0.0.1:8201"
+    echo "Tear down (from $(pwd)): BAO_SEAL_KEY=unused docker compose --profile restore down -v"
     exit 0
   }
   sleep 1

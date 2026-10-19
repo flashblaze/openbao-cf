@@ -1,5 +1,5 @@
 import { getContainer } from "@cloudflare/containers";
-import { accessJwks, verifyAccessJwt } from "./access";
+import { makeVerifier } from "./access";
 import { runBackup } from "./backup";
 import { queryKvRows } from "./db";
 import type { Env } from "./env";
@@ -10,12 +10,11 @@ export { OpenBao } from "./container";
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     return handleRequest(request, {
-      verify: (token) =>
-        verifyAccessJwt(
-          token,
-          { teamDomain: env.ACCESS_TEAM_DOMAIN, aud: env.ACCESS_AUD, ownerEmail: env.OWNER_EMAIL },
-          accessJwks(env.ACCESS_TEAM_DOMAIN),
-        ),
+      verify: makeVerifier({
+        teamDomain: env.ACCESS_TEAM_DOMAIN,
+        aud: env.ACCESS_AUD,
+        ownerEmail: env.OWNER_EMAIL,
+      }),
       forward: (r) => getContainer(env.OPENBAO, "primary").fetch(r),
     });
   },

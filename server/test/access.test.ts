@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from "jose";
-import { verifyAccessJwt } from "../src/access";
+import { makeVerifier, verifyAccessJwt } from "../src/access";
 
 const cfg = { teamDomain: "https://test.cloudflareaccess.com", aud: "test-aud", ownerEmail: "owner@example.com" };
 
@@ -62,4 +62,18 @@ test.each([
     ok: false,
     reason: "Access not configured",
   });
+});
+
+test("rejection reasons name the failing claim, not its value", async () => {
+  const aud = await verifyAccessJwt(await sign({ aud: ["other"] }), cfg, jwks);
+  expect(aud).toEqual({ ok: false, reason: "JWTClaimValidationFailed:ERR_JWT_CLAIM_VALIDATION_FAILED:aud" });
+  const iss = await verifyAccessJwt(await sign({ iss: "https://evil.cloudflareaccess.com" }), cfg, jwks);
+  expect(iss.ok).toBe(false);
+  expect(!iss.ok && iss.reason).toMatch(/:iss$/);
+  expect(!iss.ok && iss.reason).not.toContain("evil");
+});
+
+test("makeVerifier with an empty team domain returns not-configured instead of throwing", async () => {
+  const verify = makeVerifier({ ...cfg, teamDomain: "" });
+  expect(await verify(await sign({}))).toEqual({ ok: false, reason: "Access not configured" });
 });

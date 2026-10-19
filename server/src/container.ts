@@ -7,6 +7,12 @@ export class OpenBao extends Container<Env> {
   sleepAfter = "10m";
   private ready = false;
 
+  constructor(ctx: DurableObjectState<{}>, env: Env) {
+    super(ctx, env);
+    // Library-initiated restarts (e.g. inside containerFetch) fall back to this field.
+    this.envVars = { BAO_PG_CONNECTION_URL: env.NEON_DATABASE_URL, BAO_SEAL_KEY: env.BAO_SEAL_KEY };
+  }
+
   async fetch(request: Request): Promise<Response> {
     const budgetMs = 30_000;
     const started = await startAndProbe({
