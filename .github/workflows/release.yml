@@ -1,0 +1,40 @@
+name: Release
+
+# Push a version tag to publish the `secrets` CLI:
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - run: bunx tsc --noEmit
+      - name: Build binaries
+        run: |
+          mkdir -p ../release
+          for target in linux-x64 linux-arm64 darwin-arm64 darwin-x64; do
+            bun build --compile --target="bun-$target" \
+              --define "SECRETS_VERSION=\"$GITHUB_REF_NAME\"" \
+              ./src/main.ts --outfile "../release/secrets-$target"
+          done
+          test "$(../release/secrets-linux-x64 --version)" = "secrets $GITHUB_REF_NAME"
+          (cd ../release && sha256sum secrets-* > SHA256SUMS && cat SHA256SUMS)
+      - name: Publish release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release/* --verify-tag --generate-notes --title "secrets $GITHUB_REF_NAME"

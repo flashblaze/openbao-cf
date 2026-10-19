@@ -1,4 +1,4 @@
-import { APP_NAME } from "./name.ts";
+import { APP_NAME, VERSION } from "./name.ts";
 import { login } from "./commands/login.ts";
 import { run } from "./commands/run.ts";
 import { pull } from "./commands/pull.ts";
@@ -18,6 +18,7 @@ Usage:
   ${APP_NAME} envs                                 List the project's environments (* = default)
   ${APP_NAME} migrate [--yes]                      Move pre-environment secrets into the default environment
   ${APP_NAME} proxy [--login] -- <cmd...>          Run a command with BAO_ADDR pointing at a local authenticated proxy
+  ${APP_NAME} --version                            Print the version
 `;
 
 const commands: Record<string, (args: string[], io: Io) => Promise<number>> = { login, run, pull, push, envs, migrate, proxy };
@@ -27,6 +28,10 @@ export async function main(argv: string[], io: Io = defaultIo()): Promise<number
   if (name === undefined || name === "--help" || name === "-h" || name === "help") {
     io.out(HELP);
     return name === undefined ? 2 : 0;
+  }
+  if (name === "--version" || name === "-v") {
+    io.out(`${APP_NAME} ${VERSION}\n`);
+    return 0;
   }
   const cmd = Object.hasOwn(commands, name) ? commands[name] : undefined;
   if (!cmd) {

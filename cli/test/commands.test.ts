@@ -459,3 +459,12 @@ test("main: --help lists the commands, unknown command is 2", async () => {
   for (const c of ["login", "run", "pull", "push", "proxy"]) expect(outBuf).toContain(c);
   expect(await main(["bogus"], io)).toBe(2);
 });
+
+test("main: --version prints the build version (dev when unset)", async () => {
+  await setup([]);
+  expect(await main(["--version"], io)).toBe(0);
+  expect(outBuf).toBe("secrets dev\n");
+  outBuf = "";
+  expect(await main(["-v"], io)).toBe(0);
+  expect(outBuf).toBe("secrets dev\n");
+});

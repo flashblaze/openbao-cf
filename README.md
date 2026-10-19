@@ -93,12 +93,22 @@ setting `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` so Wrangler picks them up.
   and unicode. A value that can't be written safely is refused rather than corrupted.
 - **Cold start:** the first command after a quiet spell waits about 10 s for the container.
   The CLI retries while it wakes.
-- **Building the CLI:** `cd cli && bun install && bun run build` produces `dist/secrets`, a
-  single Linux x64 binary; copy it onto your `PATH`. Other platforms only need a different
-  `--target` in `cli/package.json`.
+**Install or update** from GitHub Releases. There are builds for `linux-x64` (also WSL),
+`linux-arm64`, `darwin-arm64` and `darwin-x64`. The repo is private, so this needs `gh auth login` first.
 
-**On a new machine:** install `cloudflared` and [`cf`](https://developers.cloudflare.com/cf/)
-(Node 22.18 or newer), copy the `secrets` binary, then run `secrets login`.
+```bash
+gh release download -R flashblaze/openbao-cf -p secrets-linux-x64 -O ~/.local/bin/secrets --clobber \
+  && chmod +x ~/.local/bin/secrets && secrets --version
+```
+
+Every release also includes a `SHA256SUMS` file. To build from source instead, run
+`cd cli && bun install && bun run build`, which produces `dist/secrets` and reports its
+version as `dev`.
+
+**On a new machine:**
+1. Install `cloudflared` and [`cf`](https://developers.cloudflare.com/cf/) (Node 22.18 or newer).
+2. Install `secrets` with the command above.
+3. Run `secrets login`.
 
 ## Repo layout
 
@@ -116,7 +126,7 @@ docs/
   deploy.md                deploy your own instance, step by step
   runbook.md               operating the flashblaze.dev instance
   superpowers/             the design spec and implementation plan
-.github/workflows/         Test on every push, Deploy server changes on main
+.github/workflows/         Test on every push, Deploy server changes on main, Release on v* tags
 ```
 
 ## Develop locally

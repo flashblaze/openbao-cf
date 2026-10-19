@@ -71,6 +71,24 @@ bunx cf deploy --secrets-file secrets.env --containers-rollout immediate
 - Worker secrets stay on the Worker. `cf deploy` without `--secrets-file` keeps them (tested 2026-10-19).
 - To change a Worker secret, deploy locally with `--secrets-file` as above.
 
+### Releasing the CLI
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+That one push does all of this:
+- **Runs the `Release` workflow:** it runs the CLI tests, then builds `secrets` for `linux-x64`,
+  `linux-arm64`, `darwin-arm64` and `darwin-x64` with the tag baked in (`secrets --version`).
+- **Publishes a GitHub Release:** the binaries, a `SHA256SUMS` file, and generated notes.
+
+To update a machine (this one or WSL):
+
+```bash
+gh release download -R flashblaze/openbao-cf -p secrets-linux-x64 -O ~/.local/bin/secrets --clobber \
+  && chmod +x ~/.local/bin/secrets && secrets --version
+```
+
 ## First-time setup (done 2026-10-19, kept for rebuilds)
 
 Order matters: create the Access app before the first deploy, so OpenBao is never exposed.
