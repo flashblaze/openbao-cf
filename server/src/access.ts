@@ -8,6 +8,7 @@ export async function verifyAccessJwt(
   cfg: AccessConfig,
   keys: JWTVerifyGetKey,
 ): Promise<AccessResult> {
+  if (!cfg.teamDomain || !cfg.aud || !cfg.ownerEmail) return { ok: false, reason: "Access not configured" };
   if (!token) return { ok: false, reason: "missing Access token" };
   try {
     const { payload } = await jwtVerify(token, keys, {

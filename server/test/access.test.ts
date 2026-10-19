@@ -48,3 +48,18 @@ test.each([
   const token = typeof make === "function" ? await make() : make;
   expect((await verifyAccessJwt(token, cfg, jwks)).ok).toBe(false);
 });
+
+test.each([
+  ["teamDomain", undefined],
+  ["teamDomain", ""],
+  ["aud", undefined],
+  ["aud", ""],
+  ["ownerEmail", undefined],
+  ["ownerEmail", ""],
+] as const)("rejects when cfg.%s is %p", async (field, value) => {
+  const bad = { ...cfg, [field]: value } as unknown as typeof cfg;
+  expect(await verifyAccessJwt(await sign({ aud: ["some-other-app"] }), bad, jwks)).toEqual({
+    ok: false,
+    reason: "Access not configured",
+  });
+});
