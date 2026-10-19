@@ -132,4 +132,4 @@ If the Cloudflare account is lost, dump straight from Neon instead and run the s
 
 ## Deployment log
 
-- 2026-10-19: first deploy, init and configure. UI with GitHub sign-in added. Cold start measured at about 8–9 s through the CLI. Root token revocation: owner to confirm.
+- 2026-10-19: first deploy, init and configure. UI with GitHub sign-in added. Cold start measured at about 8–9 s through the CLI. Root token revoked (owner confirmed). GitHub Actions auto-deploy set up; first CI deploy succeeded with Worker secrets kept.
