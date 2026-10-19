@@ -40,6 +40,15 @@ export function noSecretsMessage(project: Project, env: string): string {
   return `No secrets stored for project ${project.name} (${env}). Run \`${push}\` first.`;
 }
 
+export const legacyHint = (project: string) =>
+  `Found secrets for ${project} stored before environments existed. Run \`secrets migrate\` to move them into the default environment.`;
+
+/** Message for an empty env: points to `secrets migrate` when only pre-environment data exists. */
+export async function missingSecretsMessage(client: BaoClient, project: Project, env: string): Promise<string> {
+  if (env === project.defaultEnv && (await client.readLegacy(project.name)) !== null) return legacyHint(project.name);
+  return noSecretsMessage(project, env);
+}
+
 /** Removes `--env X` / `--env=X` from args (callers pass only the part before `--`). */
 export function takeEnvFlag(args: string[]): { env: string | undefined; rest: string[] } {
   let env: string | undefined;

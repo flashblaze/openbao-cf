@@ -2,11 +2,14 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp, readFile, stat, writeFile, rm, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { envs } from "../src/commands/envs.ts";
 import { login } from "../src/commands/login.ts";
+import { migrate } from "../src/commands/migrate.ts";
 import { proxy } from "../src/commands/proxy.ts";
 import { pull } from "../src/commands/pull.ts";
 import { push } from "../src/commands/push.ts";
 import { run } from "../src/commands/run.ts";
+import { legacyHint } from "../src/context.ts";
 import { parseDevVars } from "../src/dotenv.ts";
 import type { Io } from "../src/io.ts";
 import { main } from "../src/main.ts";
@@ -178,6 +181,106 @@ test("no-secrets message names the env", async () => {
   await setup([LOGIN, NOT_FOUND]);
   expect(await run(["--env", "qa", "--", "true"], io)).toBe(1);
   expect(errBuf).toContain("No secrets stored for project demo (qa). Run `secrets push --env qa` first.");
+});
+
+const LIST = (keys: string[]): Scripted => ({ status: 200, body: { data: { keys } } });
+const OK: Scripted = { status: 200, body: {} };
+const DELETED: Scripted = { status: 204 };
+const deletes = () => fake.requests.filter((r) => r.method === "DELETE");
+
+test("envs marks the default", async () => {
+  await setup([LOGIN, LIST(["staging", "dev", "sub/"])]);
+  expect(await envs([], io)).toBe(0);
+  expect(outBuf).toBe("* dev\n  staging\n");
+});
+
+test("envs with none prints a message and the legacy hint", async () => {
+  await setup([LOGIN, NOT_FOUND, READ]);
+  expect(await envs([], io)).toBe(0);
+  expect(outBuf).toBe("No environments for project demo.\n");
+  expect(errBuf).toBe(`${legacyHint("demo")}\n`);
+});
+
+test("run points to migrate when only legacy data exists", async () => {
+  await setup([LOGIN, NOT_FOUND, READ]);
+  expect(await run(["--", "sh", "-c", "echo hi > out"], io)).toBe(1);
+  expect(errBuf).toBe(`${legacyHint("demo")}\n`);
+  expect(fake.requests[2].path).toBe("/v1/secret/data/demo");
+  expect(await exists(join(dir, "out"))).toBe(false);
+});
+
+test("pull points to migrate when only legacy data exists", async () => {
+  await setup([LOGIN, NOT_FOUND, READ]);
+  expect(await pull([], io)).toBe(1);
+  expect(errBuf).toBe(`${legacyHint("demo")}\n`);
+  expect(await exists(join(dir, ".dev.vars"))).toBe(false);
+});
+
+test("run on a non-default env doesn't check legacy", async () => {
+  await setup([LOGIN, NOT_FOUND, READ]);
+  expect(await run(["--env", "qa", "--", "true"], io)).toBe(1);
+  expect(errBuf).toContain("No secrets stored for project demo (qa).");
+  expect(fake.requests.some((r) => r.path === "/v1/secret/data/demo")).toBe(false);
+});
+
+test("migrate moves, verifies, then deletes", async () => {
+  await setup([LOGIN, READ, NOT_FOUND, OK, READ, DELETED]);
+  expect(await migrate(["--yes"], io)).toBe(0);
+  expect(fake.requests.map((r) => `${r.method} ${r.path}`)).toEqual([
+    "POST /v1/auth/jwt/login",
+    "GET /v1/secret/data/demo",
+    "GET /v1/secret/data/demo/dev",
+    "POST /v1/secret/data/demo/dev",
+    "GET /v1/secret/data/demo/dev",
+    "DELETE /v1/secret/metadata/demo",
+  ]);
+  expect(fake.requests[3].body).toEqual({ data: STORED });
+  expect(outBuf).toContain("Migrated 2 keys to demo (dev).");
+});
+
+test("migrate refuses when dev already has data", async () => {
+  await setup([LOGIN, READ, READ]);
+  expect(await migrate(["--yes"], io)).toBe(1);
+  expect(errBuf).toContain("demo (dev) already has secrets; resolve manually in the web UI.");
+  expect(writes().length).toBe(0);
+  expect(deletes().length).toBe(0);
+});
+
+test("migrate keeps the old copy if verification fails", async () => {
+  await setup([LOGIN, READ, NOT_FOUND, OK, { status: 200, body: { data: { data: { API_KEY: "different" } } } }]);
+  expect(await migrate(["--yes"], io)).toBe(1);
+  expect(errBuf).toContain("Copy verification failed; old secret kept.");
+  expect(deletes().length).toBe(0);
+});
+
+test("migrate on non-TTY without --yes writes nothing", async () => {
+  await setup([LOGIN, READ, NOT_FOUND]);
+  expect(await migrate([], io)).toBe(1);
+  expect(errBuf).toContain("not a terminal; pass --yes");
+  expect(writes().length).toBe(0);
+  expect(deletes().length).toBe(0);
+});
+
+test("migrate asks on a TTY and stops on no", async () => {
+  await setup([LOGIN, READ, NOT_FOUND], { tty: true, confirm: false });
+  expect(await migrate([], io)).toBe(1);
+  expect(writes().length).toBe(0);
+});
+
+test("migrate with nothing to do", async () => {
+  await setup([LOGIN, NOT_FOUND]);
+  expect(await migrate([], io)).toBe(0);
+  expect(outBuf).toContain("Nothing to migrate.");
+});
+
+test("migrate output names keys, never values", async () => {
+  await setup([LOGIN, READ, NOT_FOUND, OK, READ, DELETED]);
+  expect(await migrate(["--yes"], io)).toBe(0);
+  expect(outBuf).toContain("API_KEY");
+  for (const v of Object.values(STORED)) {
+    expect(outBuf).not.toContain(v);
+    expect(errBuf).not.toContain(v);
+  }
 });
 
 test("pull refuses to overwrite without --force", async () => {

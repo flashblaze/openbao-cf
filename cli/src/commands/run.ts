@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { UsageError, guarded, loadContext, noSecretsMessage, resolveEnv, splitDashDash, takeEnvFlag } from "../context.ts";
+import { UsageError, guarded, loadContext, missingSecretsMessage, resolveEnv, splitDashDash, takeEnvFlag } from "../context.ts";
 import type { Io } from "../io.ts";
 import { buildChildEnv, spawnWithSignals } from "../process.ts";
 
@@ -25,9 +25,10 @@ export function run(args: string[], io: Io): Promise<number> {
         return 1;
       }
     }
-    const secret = await (await ctx.client()).readSecret(ctx.project.name, env);
+    const client = await ctx.client();
+    const secret = await client.readSecret(ctx.project.name, env);
     if (secret === null) {
-      io.err(`${noSecretsMessage(ctx.project, env)}\n`);
+      io.err(`${await missingSecretsMessage(client, ctx.project, env)}\n`);
       return 1;
     }
     return spawnWithSignals(cmd, buildChildEnv(io.env, secret), io.cwd);

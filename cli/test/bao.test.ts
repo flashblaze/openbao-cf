@@ -44,6 +44,30 @@ test("readSecret/writeSecret encode each path segment", async () => {
   await (await connect(fake.url, "J", opts())).readSecret("my-app", "pr-1");
   expect(fake.requests[1].path).toBe("/v1/secret/data/my-app/pr-1");
 });
+test("listEnvs drops folders and sorts", async () => {
+  start(LOGIN, { status: 200, body: { data: { keys: ["staging", "dev", "sub/"] } } });
+  expect(await (await connect(fake.url, "J", opts())).listEnvs("demo")).toEqual(["dev", "staging"]);
+  expect(fake.requests[1].method).toBe("GET");
+  expect(fake.requests[1].path).toBe("/v1/secret/metadata/demo/");
+  expect(fake.requests[1].query).toBe("?list=true");
+});
+test("listEnvs returns [] on 404", async () => {
+  start(LOGIN, { status: 404, body: { errors: [] } });
+  expect(await (await connect(fake.url, "J", opts())).listEnvs("demo")).toEqual([]);
+});
+test("readLegacy reads secret/<project>", async () => {
+  start(LOGIN, { status: 200, body: { data: { data: { A: "1" } } } }, { status: 404, body: { errors: [] } });
+  const c = await connect(fake.url, "J", opts());
+  expect(await c.readLegacy("demo")).toEqual({ A: "1" });
+  expect(fake.requests[1].path).toBe("/v1/secret/data/demo");
+  expect(await c.readLegacy("demo")).toBeNull();
+});
+test("deleteLegacy deletes the metadata of secret/<project> only", async () => {
+  start(LOGIN, { status: 204 });
+  await (await connect(fake.url, "J", opts())).deleteLegacy("demo");
+  expect(fake.requests[1].method).toBe("DELETE");
+  expect(fake.requests[1].path).toBe("/v1/secret/metadata/demo");
+});
 test("302 → AccessDeniedError", async () => {
   start({ status: 302, headers: { location: "https://t.cloudflareaccess.com/cdn-cgi/access/login" } });
   const err = await connect(fake.url, "J", opts()).catch((e) => e);

@@ -1,7 +1,7 @@
 import { chmod, writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { devVarsFileFor } from "../config.ts";
-import { UsageError, guarded, loadContext, noSecretsMessage, resolveEnv, takeEnvFlag } from "../context.ts";
+import { UsageError, guarded, loadContext, missingSecretsMessage, resolveEnv, takeEnvFlag } from "../context.ts";
 import { serializeDevVars } from "../dotenv.ts";
 import type { Io } from "../io.ts";
 
@@ -17,9 +17,10 @@ export function pull(args: string[], io: Io): Promise<number> {
     }
     const ctx = await loadContext(io);
     const env = resolveEnv(flag, ctx.project);
-    const secret = await (await ctx.client()).readSecret(ctx.project.name, env);
+    const client = await ctx.client();
+    const secret = await client.readSecret(ctx.project.name, env);
     if (secret === null) {
-      io.err(`${noSecretsMessage(ctx.project, env)}\n`);
+      io.err(`${await missingSecretsMessage(client, ctx.project, env)}\n`);
       return 1;
     }
     const path = devVarsFileFor(ctx.project, env);

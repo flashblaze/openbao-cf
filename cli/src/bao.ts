@@ -20,6 +20,12 @@ export type BaoClient = {
   token: string;
   readSecret(project: string, env: string): Promise<Record<string, string> | null>;
   writeSecret(project: string, env: string, data: Record<string, string>): Promise<void>;
+  /** Environment names under secret/<project>/ (sub-folders excluded), sorted. */
+  listEnvs(project: string): Promise<string[]>;
+  /** The pre-environments secret at secret/<project>, if any. */
+  readLegacy(project: string): Promise<Record<string, string> | null>;
+  /** Deletes secret/<project> and its versions; KV v2 leaves secret/<project>/<env> untouched. */
+  deleteLegacy(project: string): Promise<void>;
 };
 
 type Opts = { fetch: typeof fetch; retries?: number; retryDelayMs?: number };
@@ -90,6 +96,19 @@ export async function connect(server: string, accessJwt: string, opts: Opts): Pr
     },
     async writeSecret(project, env, data) {
       await request("POST", secretPath(project, env), { data }, token);
+    },
+    async listEnvs(project) {
+      const body = await request("GET", `/v1/secret/metadata/${encodeURIComponent(project)}/?list=true`, undefined, token, true);
+      const keys: unknown = body?.data?.keys;
+      if (!Array.isArray(keys)) return [];
+      return keys.filter((k): k is string => typeof k === "string" && !k.endsWith("/")).sort();
+    },
+    async readLegacy(project) {
+      const body = await request("GET", `/v1/secret/data/${encodeURIComponent(project)}`, undefined, token, true);
+      return body === null ? null : (body?.data?.data ?? null);
+    },
+    async deleteLegacy(project) {
+      await request("DELETE", `/v1/secret/metadata/${encodeURIComponent(project)}`, undefined, token);
     },
   };
 }
