@@ -57,6 +57,15 @@ bunx cf deploy --secrets-file secrets.env --containers-rollout immediate
 - `secrets.env` values: `ACCESS_TEAM_DOMAIN` has no trailing slash, and `OWNER_EMAIL` must match the Access token's `email` claim exactly.
 - After a deploy, the container restarts and OpenBao unseals itself (static seal). The first request can take 10–20 s.
 
+### Auto-deploy (GitHub Actions)
+
+- Repo: `flashblaze/openbao-cf` (private).
+- `Test` runs the server and CLI tests on every push.
+- `Deploy` runs on pushes to `main` that touch `server/**`, or on demand from the Actions tab. It tests, runs `cf deploy`, then checks that Access still guards the hostname.
+- CI holds only the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets and the `BAO_HOSTNAME` variable.
+- Worker secrets stay on the Worker. `cf deploy` without `--secrets-file` keeps them (tested 2026-10-19).
+- To change a Worker secret, deploy locally with `--secrets-file` as above.
+
 ## First-time setup (done 2026-10-19, kept for rebuilds)
 
 Order matters: create the Access app before the first deploy, so OpenBao is never exposed.

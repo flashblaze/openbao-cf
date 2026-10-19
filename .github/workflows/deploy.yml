@@ -1,0 +1,50 @@
+name: Deploy
+
+# Deploys the Worker + OpenBao container when server code changes on main.
+# Worker secrets (seal key, Neon URL, Access settings) are NOT stored here:
+# `cf deploy` without --secrets-file keeps the secrets already on the Worker.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CF_SEND_TELEMETRY: "false"
+      BAO_HOSTNAME: ${{ vars.BAO_HOSTNAME }}
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - run: bunx tsc --noEmit
+      - name: Deploy
+        run: bunx cf deploy --containers-rollout immediate
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Access still guards the hostname
+        run: |
+          out=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "https://$BAO_HOSTNAME/v1/sys/health")
+          echo "$out"
+          case "$out" in
+            "302 https://"*".cloudflareaccess.com/"*) ;;
+            *) echo "expected a 302 to Cloudflare Access" >&2; exit 1 ;;
+          esac
