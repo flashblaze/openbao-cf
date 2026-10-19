@@ -1,5 +1,5 @@
 import { Container } from "@cloudflare/containers";
-import { waitForReady } from "./health";
+import { startAndProbe, statusAndDrain } from "./health";
 import type { Env } from "./env";
 
 export class OpenBao extends Container<Env> {
@@ -8,23 +8,32 @@ export class OpenBao extends Container<Env> {
   private ready = false;
 
   async fetch(request: Request): Promise<Response> {
-    await this.startAndWaitForPorts({
-      startOptions: {
-        envVars: {
-          BAO_PG_CONNECTION_URL: this.env.NEON_DATABASE_URL,
-          BAO_SEAL_KEY: this.env.BAO_SEAL_KEY,
-        },
-      },
+    const budgetMs = 30_000;
+    const started = await startAndProbe({
+      budgetMs,
+      intervalMs: 500,
+      start: (timeoutMs) =>
+        this.startAndWaitForPorts({
+          startOptions: {
+            envVars: {
+              BAO_PG_CONNECTION_URL: this.env.NEON_DATABASE_URL,
+              BAO_SEAL_KEY: this.env.BAO_SEAL_KEY,
+            },
+          },
+          cancellationOptions: { portReadyTimeoutMS: timeoutMs },
+        }),
+      // After the first success the readiness probe is skipped, but start still runs every request.
+      probe: () =>
+        this.ready
+          ? Promise.resolve(200)
+          : this.containerFetch("http://openbao/v1/sys/health").then(statusAndDrain),
+      onStartError: (err) =>
+        console.warn(`container start failed: ${err instanceof Error ? `${err.name}: ${err.message}` : "unknown"}`),
     });
-    if (!this.ready) {
-      this.ready = await waitForReady(
-        () => this.containerFetch("http://openbao/v1/sys/health").then((r) => r.status),
-        { timeoutMs: 30_000, intervalMs: 500 },
-      );
-      if (!this.ready) {
-        return Response.json({ error: "openbao not ready" }, { status: 503, headers: { "retry-after": "5" } });
-      }
+    if (!started) {
+      return Response.json({ error: "openbao not ready" }, { status: 503, headers: { "retry-after": "5" } });
     }
+    this.ready = true;
     return this.containerFetch(request);
   }
 

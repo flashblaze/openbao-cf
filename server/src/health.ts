@@ -29,3 +29,36 @@ export async function waitForReady(
     await sleep(opts.intervalMs);
   }
 }
+
+// Reads the status and cancels the body so the container library's in-flight
+// counter is released (otherwise sleepAfter may never fire).
+export async function statusAndDrain(res: { status: number; body: { cancel(): Promise<void> } | null }): Promise<number> {
+  const status = res.status;
+  await res.body?.cancel();
+  return status;
+}
+
+export type StartAndProbeOptions = {
+  budgetMs: number;
+  intervalMs: number;
+  start: (timeoutMs: number) => Promise<void>;
+  probe: () => Promise<number | null>;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+  onStartError?: (err: unknown) => void;
+};
+
+// Start the container and wait for readiness within one budget. Never throws.
+export async function startAndProbe(opts: StartAndProbeOptions): Promise<boolean> {
+  const now = opts.now ?? Date.now;
+  const begin = now();
+  try {
+    await opts.start(opts.budgetMs);
+  } catch (err) {
+    opts.onStartError?.(err);
+    return false;
+  }
+  const remaining = opts.budgetMs - (now() - begin);
+  if (remaining <= 0) return false;
+  return waitForReady(opts.probe, { timeoutMs: remaining, intervalMs: opts.intervalMs, now: opts.now, sleep: opts.sleep });
+}
