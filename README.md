@@ -71,12 +71,13 @@ setting `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` so Wrangler picks them up.
 | Command | What it does |
 |---|---|
 | `secrets login [--server <url>]` | Saves the server URL and opens the Access login in your browser. Under WSL, copy the printed URL. |
-| `secrets push [file] [--env <name>] [--yes]` | Uploads `.dev.vars` (or `file`) as the environment's secrets. Shows which **key names** are added, changed or removed, then asks to confirm. |
+| `secrets push [file] [--env <name>] [--yes]` | Uploads `.dev.vars` (or `.dev.vars.<env>` for a non-default environment, or `file`) as the environment's secrets. Shows which **key names** are added, changed or removed, then asks to confirm. |
 | `secrets run [--env <name>] -- <cmd...>` | Runs `<cmd>` with the environment's secrets as env vars. Passes through the exit code and Ctrl-C. |
 | `secrets pull [--env <name>] [--force]` | Writes `.dev.vars`, or `.dev.vars.<env>` for a non-default environment (mode 0600). Won't overwrite an existing file without `--force`, and warns if the file isn't gitignored. |
 | `secrets envs` | Lists the project's environments, marking the default with `*`. |
 | `secrets migrate [--yes]` | Moves secrets pushed before environments existed into the default environment: copy, verify, then delete the old copy. |
 | `secrets proxy [--login] -- <cmd...>` | Runs `<cmd>` with `BAO_ADDR` pointing at a local proxy that adds your Access token. With `--login`, also sets `BAO_TOKEN`. Use it with `bao`. |
+| `secrets --version` | Prints the installed version: the release tag, or `dev` for a local build. |
 
 - **Project name:** each project has a committed `.secrets.json`, `{"project": "my-worker"}`
   (lowercase letters, digits, `-` and `_`). Commands find it by walking up from the current directory.
@@ -200,7 +201,7 @@ On top of a Workers Paid plan you already have:
 
 - **`cf` is in beta**, and Wrangler is still used for `npx wrangler tail` (live logs).
 - **Single owner.** Adding people means extra Access policies, OpenBao roles and policies.
-- **Linux x64 CLI build** by default.
+- **CLI builds for Linux and macOS only** (x64 and arm64), via GitHub Releases. Windows users run the Linux build under WSL.
 - **Backups aren't alerted on.** Check the R2 bucket now and then and run the restore drill
   occasionally (see the runbook).
 

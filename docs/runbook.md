@@ -15,6 +15,8 @@ Cloudflare Access, used for local dev secrets through the `secrets` CLI.
 | Access app (UI sign-in) | SaaS OIDC `Openbao UI`, redirect `https://bao.flashblaze.dev/ui/vault/auth/oidc/oidc/callback` |
 | Worker secrets | `server/secrets.env` (gitignored): `BAO_SEAL_KEY`, `NEON_DATABASE_URL`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `OWNER_EMAIL` |
 | Off-Cloudflare keys | Bitwarden item `openbao-cf`: seal key, recovery key. Without the seal key no backup can be decrypted. |
+| Code + CI | GitHub `flashblaze/openbao-cf` (private): Test, Deploy (`server/**` on `main`), Release (`v*` tags) |
+| CLI builds | GitHub Releases on that repo, `secrets-<os>-<arch>` + `SHA256SUMS`; installed at `~/.local/bin/secrets` |
 
 Cloudflare account ID: `bfa55805fd87330adc70a36c2fc285f2` (export as `CLOUDFLARE_ACCOUNT_ID` for `cf`).
 
@@ -156,3 +158,5 @@ If the Cloudflare account is lost, dump straight from Neon instead and run the s
 ## Deployment log
 
 - 2026-10-19: first deploy, init and configure. UI with GitHub sign-in added. Cold start measured at about 8–9 s through the CLI. Root token revoked (owner confirmed). GitHub Actions auto-deploy set up; first CI deploy succeeded with Worker secrets kept.
+- 2026-10-19: environments added to the CLI (`--env`, `envs`, `migrate`); no projects stored yet, so nothing to migrate.
+  First release `v0.1.0` published and installed on this machine.

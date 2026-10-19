@@ -26,7 +26,7 @@ Two rules that matter for security:
 ```bash
 git clone <this repo> && cd openbao-cf
 (cd server && bun install && bun test) && (cd cli && bun install && bun test && bun run build)
-install -m 0755 dist/secrets ~/.local/bin/secrets
+install -m 0755 dist/secrets ~/.local/bin/secrets   # or a release build, see the README
 ```
 
 ## 1. Database (Neon)
@@ -172,6 +172,10 @@ CI never holds your Worker secrets, because `cf deploy` without `--secrets-file`
    the hostname still redirects to Access.
 
 To change a Worker secret later, deploy from your machine with `--secrets-file`, as in step 4.
+
+The same repo also has a `Release` workflow. Pushing a `v*` tag (`git tag v0.1.0 && git push
+origin v0.1.0`) builds `secrets` for Linux and macOS and attaches the builds to a GitHub
+Release. It needs no extra secrets, because it uses the workflow's own token.
 
 ## 8. Use it
 
