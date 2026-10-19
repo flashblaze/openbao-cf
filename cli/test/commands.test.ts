@@ -125,6 +125,61 @@ test("pull writes .dev.vars 0600 and round-trips", async () => {
   expect(outBuf).not.toContain("abc");
 });
 
+test("run --env staging reads the staging secret", async () => {
+  await setup([LOGIN, { status: 200, body: { data: { data: { API_KEY: "stg" } } } }]);
+  const code = await run(["--env", "staging", "--", "sh", "-c", 'printf %s "$API_KEY" > out'], io);
+  expect(code).toBe(0);
+  expect(fake.requests[1].path).toBe("/v1/secret/data/demo/staging");
+  expect(await readFile(join(dir, "out"), "utf8")).toBe("stg");
+});
+
+test("run uses defaultEnv from .secrets.json", async () => {
+  await setup([LOGIN, READ]);
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "demo", defaultEnv: "local" }));
+  expect(await run(["--", "true"], io)).toBe(0);
+  expect(fake.requests[1].path).toBe("/v1/secret/data/demo/local");
+});
+
+test("run leaves --env after -- to the child", async () => {
+  await setup([LOGIN, READ]);
+  const code = await run(["--", "sh", "-c", 'printf %s "$*" > out', "_", "--env", "x"], io);
+  expect(code).toBe(0);
+  expect(fake.requests[1].path).toBe("/v1/secret/data/demo/dev");
+  expect(await readFile(join(dir, "out"), "utf8")).toBe("--env x");
+});
+
+test("invalid --env is a usage error", async () => {
+  await setup([LOGIN, READ]);
+  expect(await run(["--env", "Bad!", "--", "true"], io)).toBe(2);
+  expect(errBuf).toContain("Invalid environment name: Bad!");
+  expect(fake.requests.length).toBe(0);
+});
+
+test("pull --env staging writes .dev.vars.staging only", async () => {
+  await setup([LOGIN, READ]);
+  expect(await pull(["--env", "staging"], io)).toBe(0);
+  expect(fake.requests[1].path).toBe("/v1/secret/data/demo/staging");
+  expect(parseDevVars(await readFile(join(dir, ".dev.vars.staging"), "utf8"))).toEqual(STORED);
+  expect(await exists(join(dir, ".dev.vars"))).toBe(false);
+  expect(outBuf).toContain("(staging)");
+});
+
+test("push --env staging reads .dev.vars.staging by default", async () => {
+  await setup([LOGIN, NOT_FOUND, { status: 200, body: {} }]);
+  await writeFile(join(dir, ".dev.vars.staging"), "A=1\nB=2\n");
+  expect(await push(["--env", "staging", "--yes"], io)).toBe(0);
+  const w = writes()[0];
+  expect(w.path).toBe("/v1/secret/data/demo/staging");
+  expect(w.body).toEqual({ data: { A: "1", B: "2" } });
+  expect(outBuf).toContain("Pushed 2 keys to demo (staging).");
+});
+
+test("no-secrets message names the env", async () => {
+  await setup([LOGIN, NOT_FOUND]);
+  expect(await run(["--env", "qa", "--", "true"], io)).toBe(1);
+  expect(errBuf).toContain("No secrets stored for project demo (qa). Run `secrets push --env qa` first.");
+});
+
 test("pull refuses to overwrite without --force", async () => {
   await setup([LOGIN, READ, LOGIN, READ]);
   expect(await pull([], io)).toBe(0);

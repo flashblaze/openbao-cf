@@ -11,33 +11,38 @@ const start = (...script: Scripted[]) => (fake = startFakeBao(script));
 test("logs in with role owner and sends cf-access-token everywhere", async () => {
   start(LOGIN, { status: 200, body: { data: { data: { A: "1" } } } });
   const c = await connect(fake.url, "J", opts());
-  await c.readSecret("proj");
+  await c.readSecret("proj", "dev");
   const [login, read] = fake.requests;
   expect(login.method).toBe("POST");
   expect(login.path).toBe("/v1/auth/jwt/login");
   expect(login.body).toEqual({ role: "owner", jwt: "J" });
   expect(login.headers.get("cf-access-token")).toBe("J");
   expect(login.headers.get("x-vault-token")).toBeNull();
-  expect(read.path).toBe("/v1/secret/data/proj");
+  expect(read.path).toBe("/v1/secret/data/proj/dev");
   expect(read.headers.get("cf-access-token")).toBe("J");
   expect(read.headers.get("x-vault-token")).toBe("s.tok");
   expect(c.token).toBe("s.tok");
 });
 test("readSecret returns data.data", async () => {
   start(LOGIN, { status: 200, body: { data: { data: { API_KEY: "abc" }, metadata: {} } } });
-  expect(await (await connect(fake.url, "J", opts())).readSecret("p")).toEqual({ API_KEY: "abc" });
+  expect(await (await connect(fake.url, "J", opts())).readSecret("p", "dev")).toEqual({ API_KEY: "abc" });
 });
 test("readSecret returns null on 404", async () => {
   start(LOGIN, { status: 404, body: { errors: [] } });
-  expect(await (await connect(fake.url, "J", opts())).readSecret("p")).toBeNull();
+  expect(await (await connect(fake.url, "J", opts())).readSecret("p", "dev")).toBeNull();
 });
 test("writeSecret posts {data}", async () => {
   start(LOGIN, { status: 200, body: { data: { version: 1 } } });
-  await (await connect(fake.url, "J", opts())).writeSecret("p", { A: "1" });
+  await (await connect(fake.url, "J", opts())).writeSecret("p", "staging", { A: "1" });
   const w = fake.requests[1];
   expect(w.method).toBe("POST");
-  expect(w.path).toBe("/v1/secret/data/p");
+  expect(w.path).toBe("/v1/secret/data/p/staging");
   expect(w.body).toEqual({ data: { A: "1" } });
+});
+test("readSecret/writeSecret encode each path segment", async () => {
+  start(LOGIN, { status: 404, body: { errors: [] } });
+  await (await connect(fake.url, "J", opts())).readSecret("my-app", "pr-1");
+  expect(fake.requests[1].path).toBe("/v1/secret/data/my-app/pr-1");
 });
 test("302 → AccessDeniedError", async () => {
   start({ status: 302, headers: { location: "https://t.cloudflareaccess.com/cdn-cgi/access/login" } });
@@ -53,7 +58,7 @@ test("worker 403 → AccessDeniedError", async () => {
 test("openbao 403 → BaoError", async () => {
   start(LOGIN, { status: 403, body: { errors: ["permission denied"] } });
   const c = await connect(fake.url, "J", opts());
-  const err = await c.readSecret("p").catch((e) => e);
+  const err = await c.readSecret("p", "dev").catch((e) => e);
   expect(err).toBeInstanceOf(BaoError);
   expect(err).not.toBeInstanceOf(AccessDeniedError);
   expect(err.status).toBe(403);
@@ -62,7 +67,7 @@ test("openbao 403 → BaoError", async () => {
 test("non-JSON error body → HTTP <status>", async () => {
   start(LOGIN, { status: 500 });
   const c = await connect(fake.url, "J", opts());
-  const err = await c.readSecret("p").catch((e) => e);
+  const err = await c.readSecret("p", "dev").catch((e) => e);
   expect(err).toBeInstanceOf(BaoError);
   expect(err.message).toBe("HTTP 500");
 });
@@ -83,7 +88,7 @@ test("gives up after retries", async () => {
 test("errors never contain the JWT or token", async () => {
   start(LOGIN, { status: 403, body: { errors: ["permission denied"] } });
   const c = await connect(fake.url, "JWT.SECRET.VALUE", opts());
-  const err = await c.readSecret("p").catch((e) => e);
+  const err = await c.readSecret("p", "dev").catch((e) => e);
   expect(String(err.message) + String(err.stack)).not.toContain("JWT.SECRET.VALUE");
   expect(String(err.message)).not.toContain("s.tok");
 });

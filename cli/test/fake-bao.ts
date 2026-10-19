@@ -1,5 +1,5 @@
 export type Scripted = { status: number; body?: unknown; headers?: Record<string, string>; delayMs?: number };
-export type Logged = { method: string; path: string; headers: Headers; body: unknown };
+export type Logged = { method: string; path: string; query: string; headers: Headers; body: unknown };
 export type FakeBao = { url: string; requests: Logged[]; queue: Scripted[]; stop(): void };
 
 /** Fake OpenBao: plays `queue` responses in order (200 `{}` once empty) and logs every request. */
@@ -12,9 +12,11 @@ export function startFakeBao(script: Scripted[] = []): FakeBao {
     idleTimeout: 0,
     async fetch(req) {
       const text = await req.text();
+      const url = new URL(req.url);
       requests.push({
         method: req.method,
-        path: new URL(req.url).pathname,
+        path: url.pathname,
+        query: url.search,
         headers: req.headers,
         body: text ? JSON.parse(text) : null,
       });

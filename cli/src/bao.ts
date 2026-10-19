@@ -18,8 +18,8 @@ export class BaoError extends Error {
 
 export type BaoClient = {
   token: string;
-  readSecret(project: string): Promise<Record<string, string> | null>;
-  writeSecret(project: string, data: Record<string, string>): Promise<void>;
+  readSecret(project: string, env: string): Promise<Record<string, string> | null>;
+  writeSecret(project: string, env: string, data: Record<string, string>): Promise<void>;
 };
 
 type Opts = { fetch: typeof fetch; retries?: number; retryDelayMs?: number };
@@ -80,15 +80,16 @@ export async function connect(server: string, accessJwt: string, opts: Opts): Pr
   const token = login?.auth?.client_token;
   if (typeof token !== "string" || !token) throw new BaoError(200, "OpenBao login returned no token");
 
-  const secretPath = (project: string) => `/v1/secret/data/${encodeURIComponent(project)}`;
+  const secretPath = (project: string, env: string) =>
+    `/v1/secret/data/${encodeURIComponent(project)}/${encodeURIComponent(env)}`;
   return {
     token,
-    async readSecret(project) {
-      const body = await request("GET", secretPath(project), undefined, token, true);
+    async readSecret(project, env) {
+      const body = await request("GET", secretPath(project, env), undefined, token, true);
       return body === null ? null : (body?.data?.data ?? null);
     },
-    async writeSecret(project, data) {
-      await request("POST", secretPath(project), { data }, token);
+    async writeSecret(project, env, data) {
+      await request("POST", secretPath(project, env), { data }, token);
     },
   };
 }

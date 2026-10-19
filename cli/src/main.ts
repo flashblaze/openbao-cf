@@ -9,11 +9,11 @@ import { defaultIo, type Io } from "./io.ts";
 const HELP = `${APP_NAME} - project secrets stored in OpenBao
 
 Usage:
-  ${APP_NAME} login [--server <url>]       Sign in via Cloudflare Access and remember the server
-  ${APP_NAME} run -- <cmd...>              Run a command with the project's secrets in its environment
-  ${APP_NAME} pull [--force]               Write the project's secrets to .dev.vars
-  ${APP_NAME} push [file] [--yes]          Store .dev.vars (or file) as the project's secrets
-  ${APP_NAME} proxy [--login] -- <cmd...>  Run a command with BAO_ADDR pointing at a local authenticated proxy
+  ${APP_NAME} login [--server <url>]               Sign in via Cloudflare Access and remember the server
+  ${APP_NAME} run [--env <name>] -- <cmd...>       Run a command with the project's secrets in its environment
+  ${APP_NAME} pull [--env <name>] [--force]        Write the secrets to .dev.vars (.dev.vars.<env> for other envs)
+  ${APP_NAME} push [file] [--env <name>] [--yes]   Store .dev.vars (or file) as the project's secrets
+  ${APP_NAME} proxy [--login] -- <cmd...>          Run a command with BAO_ADDR pointing at a local authenticated proxy
 `;
 
 const commands: Record<string, (args: string[], io: Io) => Promise<number>> = { login, run, pull, push, proxy };
