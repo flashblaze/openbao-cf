@@ -1,0 +1,21 @@
+{
+  "name": "openbao-cf-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test test/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "jose": "6.2.12",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261019.1",
+    "@types/bun": "1.4.3",
+    "@types/pg": "8.23.1",
+    "cf": "1.0.0-beta.18",
+    "typescript": "7.0.2"
+  }
+}
