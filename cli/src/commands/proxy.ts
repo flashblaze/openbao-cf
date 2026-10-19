@@ -34,6 +34,9 @@ export function proxy(args: string[], io: Io): Promise<number> {
     const server = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
+      // Bun's default 10 s idle timeout drops requests during a container cold start
+      // (the Worker may wait up to 30 s for OpenBao), so allow well past that.
+      idleTimeout: 120,
       async fetch(req) {
         // Reject DNS-rebinding callers: only loopback Host values may use the injected JWT.
         const host = (req.headers.get("host") ?? "").toLowerCase();

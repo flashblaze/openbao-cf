@@ -198,6 +198,17 @@ test("proxy works without a .secrets.json", async () => {
   expect(fake.requests.length).toBe(1);
 });
 
+test(
+  "proxy waits out a slow upstream (container cold start)",
+  async () => {
+    await setup([{ status: 200, body: { initialized: true }, delayMs: 16_000 }]);
+    const code = await proxy(["--", "sh", "-c", 'curl -sf -m 40 "$BAO_ADDR/v1/sys/health" > out'], io);
+    expect(code).toBe(0);
+    expect(await readFile(join(dir, "out"), "utf8")).toContain("initialized");
+  },
+  30_000,
+);
+
 test("proxy without a server config is a usage error", async () => {
   await setup([], { config: false });
   expect(await proxy(["--", "true"], io)).toBe(2);
