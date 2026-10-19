@@ -105,6 +105,10 @@ One person, the owner. No teammates for now.
 - The container and database may sleep when idle; a few seconds of wait on the
   first fetch after a break is fine.
 - The overall shape below (played back in conversation and approved).
+- Web UI on, with GitHub sign-in (added 2026-10-19, after the first deploy): a
+  Cloudflare Access "SaaS / OIDC" application is the OIDC provider for an
+  OpenBao `oidc` auth method whose `owner` role is bound to the owner's email
+  (`server/scripts/configure-oidc.sh`).
 
 ### My calls (approved as part of the playback, but flagged so they're easy to revisit)
 

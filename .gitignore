@@ -2,5 +2,6 @@ node_modules
 dist
 .cloudflare
 server/secrets.env
+server/oidc.env
 *.key
 .dev.vars

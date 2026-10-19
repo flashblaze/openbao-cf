@@ -15,7 +15,7 @@ listener "tcp" {
 }
 
 disable_mlock = true
-ui            = false
+ui            = true
 
 # OpenBao 2.7 refuses `bao audit enable` over the API; audit devices are declarative.
 audit "file" "stdout" {
