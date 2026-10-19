@@ -26,9 +26,13 @@ cd <project with .secrets.json>                     # {"project":"<name>"}
 secrets push            # upload ./.dev.vars (shows key names, asks to confirm)
 secrets run -- wrangler dev
 secrets pull            # write .dev.vars instead (refuses to overwrite without --force)
+secrets push --env staging && secrets run --env staging -- wrangler dev --env staging
+secrets envs            # list environments (* = default, "dev" unless .secrets.json sets "defaultEnv")
 ```
 
 - `run` refuses while any `.dev.vars` or `.dev.vars.<env>` exists, because Wrangler then ignores injected env.
+- After upgrading to a CLI with environments, run `secrets migrate` once in any project pushed before then.
+  It moves `secret/<project>` to `secret/<project>/dev`; `run` and `pull` point you to it.
 - The first command after a quiet spell wakes the container: expect about 10 s.
 - Web UI: `https://bao.flashblaze.dev/ui` → method **OIDC**, role blank → **Sign in** (GitHub popup).
 

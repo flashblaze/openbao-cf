@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full local flow: CLI push/run/pull against OpenBao, backup, restore drill, read from the restore.
+# Full local flow: CLI push/run/pull (+ environments, legacy migrate) against OpenBao, backup, restore drill, read from the restore.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source test/e2e/lib.sh
@@ -47,6 +47,33 @@ echo "== pull"
   const b = parseDevVars(readFileSync(process.argv[2], "utf8"));
   if (JSON.stringify(Object.entries(a).sort()) !== JSON.stringify(Object.entries(b).sort())) { console.error("pull mismatch", a, b); process.exit(1); }
 ' "$TMP/orig.dev.vars" "$PROJ/.dev.vars")
+
+echo "== environments"
+printf 'PLAIN=staging-value\n' > .dev.vars.staging
+"$SECRETS" push --yes --env staging
+rm .dev.vars .dev.vars.staging   # run refuses while any .dev.vars* exists
+OUT=$("$SECRETS" run --env staging -- sh -c 'printf %s "$PLAIN"')
+[ "$OUT" = staging-value ] || fail "run --env staging got: $OUT"
+OUT=$("$SECRETS" run -- sh -c 'printf %s "$PLAIN"')
+[ "$OUT" = hello ] || fail "run (default env) got: $OUT"
+[ "$("$SECRETS" envs)" = $'* dev\n  staging' ] || fail "envs output: $("$SECRETS" envs)"
+
+echo "== migrate pre-environment data (real OpenBao)"
+LEG="$TMP/legacy"; mkdir -p "$LEG"
+echo '{"project":"legacyproj"}' > "$LEG/.secrets.json"
+curl -sf -H "X-Vault-Token: $ROOT" -X POST http://127.0.0.1:8200/v1/secret/data/legacyproj \
+  -d '{"data":{"OLD":"v1","OTHER":"v2"}}' >/dev/null
+cd "$LEG"
+if "$SECRETS" run -- true 2>"$TMP/leg.err"; then fail "run should refuse with legacy-only data"; fi
+grep -q "secrets migrate" "$TMP/leg.err" || fail "missing legacy hint: $(cat "$TMP/leg.err")"
+"$SECRETS" migrate --yes
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "X-Vault-Token: $ROOT" http://127.0.0.1:8200/v1/secret/data/legacyproj)
+[ "$code" = 404 ] || fail "legacy secret still present (HTTP $code)"
+# Deleting secret/legacyproj must leave secret/legacyproj/dev intact.
+MIG=$(curl -sf -H "X-Vault-Token: $ROOT" http://127.0.0.1:8200/v1/secret/data/legacyproj/dev | jq -cS .data.data)
+[ "$MIG" = '{"OLD":"v1","OTHER":"v2"}' ] || fail "migrated data mismatch: $MIG"
+OUT=$("$SECRETS" run -- sh -c 'printf %s "$OLD"')
+[ "$OUT" = v1 ] || fail "run after migrate got: $OUT"
 cd "$REPO/server"
 
 echo "== backup + restore drill"
@@ -62,8 +89,10 @@ echo "== read from restore"
 RJWT=$(owner_jwt)
 RTOKEN=$(curl -sf -X POST http://127.0.0.1:8201/v1/auth/jwt/login \
   -d "$(jq -nc --arg jwt "$RJWT" '{role:"owner",jwt:$jwt}')" | jq -r .auth.client_token)
-DATA=$(curl -sf -H "X-Vault-Token: $RTOKEN" http://127.0.0.1:8201/v1/secret/data/demo | jq -c .data.data)
+DATA=$(curl -sf -H "X-Vault-Token: $RTOKEN" http://127.0.0.1:8201/v1/secret/data/demo/dev | jq -c .data.data)
 [ "$(jq -r .MULTI <<<"$DATA")" = "$EXPECT_MULTI" ] || fail "restored MULTI mismatch"
 [ "$(jq -r .QUOTED <<<"$DATA")" = "has # hash and 'single' quotes" ] || fail "restored QUOTED mismatch"
 [ "$(jq -r .PLAIN <<<"$DATA")" = hello ] || fail "restored PLAIN mismatch"
+STG=$(curl -sf -H "X-Vault-Token: $RTOKEN" http://127.0.0.1:8201/v1/secret/data/demo/staging | jq -r .data.data.PLAIN)
+[ "$STG" = staging-value ] || fail "restored staging mismatch"
 echo "PASS"

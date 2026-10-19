@@ -181,6 +181,11 @@ echo '{"project":"my-worker"}' > .secrets.json && git add .secrets.json
 secrets push                 # from the machine that has .dev.vars
 rm .dev.vars                 # `run` refuses while a .dev.vars exists (Wrangler would ignore the injected env)
 secrets run -- wrangler dev
+
+# Other environments: push .dev.vars.staging, then pick it per command
+secrets push --env staging   # reads .dev.vars.staging
+secrets run --env staging -- wrangler dev --env staging
+secrets envs                 # * dev / staging
 ```
 
 ## 9. Backups

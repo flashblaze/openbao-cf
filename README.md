@@ -7,8 +7,9 @@ On any machine, after one browser login, it puts a project's local dev secrets i
 
 ```bash
 secrets login --server https://bao.example.com   # once per machine (GitHub/Access in the browser)
-cd my-worker && secrets push                      # upload ./.dev.vars once
+cd my-worker && secrets push                      # upload ./.dev.vars once (environment "dev")
 secrets run -- wrangler dev                       # anywhere else: no .dev.vars on disk
+secrets run --env staging -- wrangler dev --env staging   # other environments, like Infisical's --env
 ```
 
 ## Why
@@ -70,13 +71,21 @@ setting `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` so Wrangler picks them up.
 | Command | What it does |
 |---|---|
 | `secrets login [--server <url>]` | Saves the server URL and opens the Access login in your browser. Under WSL, copy the printed URL. |
-| `secrets push [file] [--yes]` | Uploads `.dev.vars` (or `file`) as the project's secrets. Shows which **key names** are added, changed or removed, then asks to confirm. |
-| `secrets run -- <cmd...>` | Runs `<cmd>` with the secrets as env vars. Passes through the exit code and Ctrl-C. |
-| `secrets pull [--force]` | Writes `.dev.vars` (mode 0600). Won't overwrite an existing file without `--force`, and warns if the file isn't gitignored. |
+| `secrets push [file] [--env <name>] [--yes]` | Uploads `.dev.vars` (or `file`) as the environment's secrets. Shows which **key names** are added, changed or removed, then asks to confirm. |
+| `secrets run [--env <name>] -- <cmd...>` | Runs `<cmd>` with the environment's secrets as env vars. Passes through the exit code and Ctrl-C. |
+| `secrets pull [--env <name>] [--force]` | Writes `.dev.vars`, or `.dev.vars.<env>` for a non-default environment (mode 0600). Won't overwrite an existing file without `--force`, and warns if the file isn't gitignored. |
+| `secrets envs` | Lists the project's environments, marking the default with `*`. |
+| `secrets migrate [--yes]` | Moves secrets pushed before environments existed into the default environment: copy, verify, then delete the old copy. |
 | `secrets proxy [--login] -- <cmd...>` | Runs `<cmd>` with `BAO_ADDR` pointing at a local proxy that adds your Access token. With `--login`, also sets `BAO_TOKEN`. Use it with `bao`. |
 
 - **Project name:** each project has a committed `.secrets.json`, `{"project": "my-worker"}`
   (lowercase letters, digits, `-` and `_`). Commands find it by walking up from the current directory.
+- **Environments:** each project can hold several named sets of secrets, such as `dev`,
+  `staging` or `pr-12`, stored at `secret/<project>/<env>`.
+  - Commands use `dev` unless you pass `--env <name>`, or set `"defaultEnv"` in `.secrets.json`.
+  - The default environment pairs with `.dev.vars`; any other environment `X` pairs with
+    `.dev.vars.X`, the file `wrangler dev --env X` reads. For example:
+    `secrets run --env staging -- wrangler dev --env staging`.
 - **No values in output:** values never appear in the CLI's output, and every message names keys only.
 - **`.dev.vars` must be absent:** `run` refuses to start while a `.dev.vars` or `.dev.vars.<env>`
   file exists, because Wrangler ignores injected env vars when one is present.
