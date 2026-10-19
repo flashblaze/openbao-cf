@@ -1,4 +1,6 @@
-export type Runner = (cmd: string[]) => Promise<{ code: number; stdout: string; stderr: string }>;
+export type RunOpts = { cwd?: string };
+
+export type Runner = (cmd: string[], opts?: RunOpts) => Promise<{ code: number; stdout: string; stderr: string }>;
 
 export type Io = {
   cwd: string;
@@ -9,11 +11,11 @@ export type Io = {
   confirm(q: string): Promise<boolean>;
   fetch: typeof fetch;
   run: Runner;
-  runInherit(cmd: string[]): Promise<number>;
+  runInherit(cmd: string[], opts?: RunOpts): Promise<number>;
 };
 
-const run: Runner = async (cmd) => {
-  const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+const run: Runner = async (cmd, opts) => {
+  const proc = Bun.spawn(cmd, { cwd: opts?.cwd, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
   const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
@@ -47,8 +49,8 @@ export function defaultIo(): Io {
     confirm,
     fetch: globalThis.fetch,
     run,
-    runInherit: async (cmd) => {
-      const proc = Bun.spawn(cmd, { stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+    runInherit: async (cmd, opts) => {
+      const proc = Bun.spawn(cmd, { cwd: opts?.cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
       return proc.exited;
     },
   };

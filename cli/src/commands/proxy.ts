@@ -1,5 +1,5 @@
 import { getAccessToken } from "../access.ts";
-import { UsageError, guarded, loadContext, splitDashDash } from "../context.ts";
+import { UsageError, guarded, loadServerContext, splitDashDash } from "../context.ts";
 import type { Io } from "../io.ts";
 import { buildChildEnv, spawnWithSignals } from "../process.ts";
 
@@ -26,7 +26,7 @@ export function proxy(args: string[], io: Io): Promise<number> {
       if (a === "--login") withLogin = true;
       else throw new UsageError(`Unknown argument: ${a}`);
     }
-    const ctx = await loadContext(io);
+    const ctx = await loadServerContext(io);
     const jwt = await getAccessToken(ctx.server, { env: io.env, run: io.run });
     const env: Record<string, string> = {};
     if (withLogin) env.BAO_TOKEN = (await ctx.client()).token;
@@ -35,6 +35,11 @@ export function proxy(args: string[], io: Io): Promise<number> {
       hostname: "127.0.0.1",
       port: 0,
       async fetch(req) {
+        // Reject DNS-rebinding callers: only loopback Host values may use the injected JWT.
+        const host = (req.headers.get("host") ?? "").toLowerCase();
+        if (host !== `127.0.0.1:${server.port}` && host !== `localhost:${server.port}`) {
+          return new Response("forbidden host\n", { status: 403 });
+        }
         const url = new URL(req.url);
         const headers = stripHeaders(req.headers, ["host", "content-length"]);
         headers.set("cf-access-token", jwt);

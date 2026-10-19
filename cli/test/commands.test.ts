@@ -92,6 +92,15 @@ test("run refuses when .dev.vars exists in the cwd below the project root", asyn
   expect(await exists(join(dir, "sub", "out"))).toBe(false);
 });
 
+test("run refuses when .dev.vars.<env> exists", async () => {
+  await setup([LOGIN, READ]);
+  await writeFile(join(dir, ".dev.vars.staging"), "X=1\n");
+  expect(await run(["--", "sh", "-c", "echo hi > out"], io)).toBe(1);
+  expect(errBuf).toContain(join(dir, ".dev.vars.staging"));
+  expect(await exists(join(dir, "out"))).toBe(false);
+  expect(fake.requests.length).toBe(0);
+});
+
 test("run on an empty project explains", async () => {
   await setup([LOGIN, NOT_FOUND]);
   const code = await run(["--", "sh", "-c", "echo hi > out"], io);
@@ -180,6 +189,31 @@ test("proxy gives the child a BAO_ADDR that adds the header", async () => {
   expect(fake.requests[0].path).toBe("/v1/sys/health");
   expect(fake.requests[0].headers.get("cf-access-token")).toBe("J");
   expect(await readFile(join(dir, "out"), "utf8")).toContain("initialized");
+});
+
+test("proxy works without a .secrets.json", async () => {
+  await setup([{ status: 200, body: { initialized: true } }]);
+  await rm(join(dir, ".secrets.json"));
+  expect(await proxy(["--", "sh", "-c", 'curl -sf "$BAO_ADDR/v1/sys/health" > out; exit 5'], io)).toBe(5);
+  expect(fake.requests.length).toBe(1);
+});
+
+test("proxy without a server config is a usage error", async () => {
+  await setup([], { config: false });
+  expect(await proxy(["--", "true"], io)).toBe(2);
+  expect(errBuf).toContain("secrets login --server");
+});
+
+test("proxy rejects foreign Host headers", async () => {
+  await setup([{ status: 200, body: { initialized: true } }]);
+  const code = await proxy(
+    ["--", "sh", "-c", 'curl -s -o /dev/null -w "%{http_code}" -H "Host: evil.example" "$BAO_ADDR/v1/sys/health" > evil; curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost:${BAO_ADDR##*:}" "$BAO_ADDR/v1/sys/health" > local'],
+    io,
+  );
+  expect(code).toBe(0);
+  expect(await readFile(join(dir, "evil"), "utf8")).toBe("403");
+  expect(await readFile(join(dir, "local"), "utf8")).toBe("200");
+  expect(fake.requests.length).toBe(1);
 });
 
 test("proxy --login sets BAO_TOKEN and forwards body and query", async () => {
