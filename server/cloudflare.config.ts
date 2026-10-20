@@ -11,6 +11,8 @@ const container = defineContainer({
   image: { dockerfile: "./container/Dockerfile" },
   instanceType: "lite",
   maxInstances: 1,
+  // Run next to the owner (India) and the Neon database (ap-southeast-1); unpinned, it landed in Newark.
+  constraints: { regions: ["APAC"] },
 });
 
 export default defineConfig({
