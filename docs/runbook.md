@@ -8,7 +8,7 @@ Cloudflare Access, used for local dev secrets through the `secrets` CLI.
 | Thing | Name / location |
 |---|---|
 | Worker | `openbao-cf` (custom domain `bao.flashblaze.dev`; `workers.dev` and preview URLs off) |
-| Container app | `openbao` (`lite`, max 1 instance, sleeps after 10 min idle) |
+| Container app | `openbao` (`lite`, max 1 instance, sleeps after 10 min idle), pinned to `APAC` (runs in Mumbai, `bom08`; unpinned it ran in Newark) |
 | Database | Neon project (direct, non-pooled host, `sslmode=verify-full`); table `openbao_kv_store` |
 | Backups | R2 bucket `openbao-cf-backups`, `backups/YYYY-MM-DD.ndjson`, daily 03:17 UTC, 30 days kept |
 | Access app (API + CLI) | self-hosted `openbao` on `bao.flashblaze.dev`: GitHub login + owner email, 24h session |
@@ -160,3 +160,9 @@ If the Cloudflare account is lost, dump straight from Neon instead and run the s
 - 2026-10-19: first deploy, init and configure. UI with GitHub sign-in added. Cold start measured at about 8–9 s through the CLI. Root token revoked (owner confirmed). GitHub Actions auto-deploy set up; first CI deploy succeeded with Worker secrets kept.
 - 2026-10-19: environments added to the CLI (`--env`, `envs`, `migrate`); no projects stored yet, so nothing to migrate.
   First release `v0.1.0` published and installed on this machine.
+- 2026-10-20: slowness traced to placement, not resources. The container had landed in Newark (owner in India,
+  Neon in Singapore), so every request and every database query crossed about 230 ms of round trip. On top of that,
+  each request ran the library's start check (a ping to the container plus a state write).
+  - Fix 1: pinned the container to `APAC` (now `bom08`).
+  - Fix 2: skip the start check once OpenBao is ready.
+  - Warm request on a reused connection: 1.7–4.2 s before, 0.14–0.17 s after. UI start page: 7.7 s before, about 1 s after.
