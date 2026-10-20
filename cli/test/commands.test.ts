@@ -553,3 +553,27 @@ test("init warns when .dev.vars is not gitignored", async () => {
   expect(await init([], io)).toBe(0);
   expect(errBuf).toContain(".dev.vars is not gitignored");
 });
+
+test("init --project needs a value", async () => {
+  await setup([]);
+  await initDir("v");
+  io.run = gitStub(null);
+  for (const args of [["--project"], ["--project="], ["--project", "--env", "dev"]]) {
+    errBuf = "";
+    expect(await init(args, io)).toBe(2);
+    expect(errBuf).toContain("--project needs a value");
+  }
+  expect(await exists(join(io.cwd, ".secrets.json"))).toBe(false);
+});
+
+test("init --force keeps the existing project and defaultEnv unless given", async () => {
+  await setup([]);
+  io.run = gitStub(join(dir, "elsewhere"));
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "instaclock/api", defaultEnv: "local" }));
+  expect(await init(["--force"], io)).toBe(0);
+  expect(JSON.parse(await readFile(join(dir, ".secrets.json"), "utf8"))).toEqual({ project: "instaclock/api", defaultEnv: "local" });
+  expect(await init(["--force", "--env", "qa"], io)).toBe(0);
+  expect(JSON.parse(await readFile(join(dir, ".secrets.json"), "utf8"))).toEqual({ project: "instaclock/api", defaultEnv: "qa" });
+  expect(await init(["--force", "--project", "acme/web"], io)).toBe(0);
+  expect(JSON.parse(await readFile(join(dir, ".secrets.json"), "utf8"))).toEqual({ project: "acme/web", defaultEnv: "qa" });
+});
