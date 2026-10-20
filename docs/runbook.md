@@ -165,6 +165,8 @@ If the Cloudflare account is lost, dump straight from Neon instead and run the s
   each request ran the library's start check (a ping to the container plus a state write).
   - Fix 1: pinned the container to `APAC` (now `bom08`).
   - Fix 2: skip the start check once OpenBao is ready.
-  - Warm request on a reused connection: 1.7–4.2 s before, 0.14–0.17 s after. UI start page: 7.7 s before, about 1 s after.
+  - New connection per request: avg 2.45 s before, 1.10 s after.
+  - Reused connection: 0.41 s after the region fix, 0.15 s after both fixes (not measured on the Newark setup).
+  - UI start page: 7.77 s before, 0.95 s after.
 - 2026-10-20: `v0.2.0` reads cloudflared's cached Access token instead of calling `cf access token` each time.
   `secrets run`: 3.4–5.0 s before, 1.6–2.1 s after.
