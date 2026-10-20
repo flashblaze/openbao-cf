@@ -20,7 +20,7 @@ test("probes once even with zero timeout", async () => {
   expect(await waitForReady(async () => 200, { timeoutMs: 0, intervalMs: 1 })).toBe(true);
 });
 
-import { startAndProbe, statusAndDrain } from "../src/health";
+import { canSkipStart, startAndProbe, statusAndDrain } from "../src/health";
 
 test("startAndProbe: start throwing means not ready, without probing", async () => {
   let probed = false;
@@ -62,4 +62,11 @@ test("statusAndDrain cancels the body and returns the status", async () => {
   expect(s).toBe(200);
   expect(cancelled).toBe(true);
   expect(await statusAndDrain({ status: 501, body: null })).toBe(501);
+});
+
+test("canSkipStart only when OpenBao was ready and the container is still running", () => {
+  expect(canSkipStart({ ready: true, running: true })).toBe(true);
+  expect(canSkipStart({ ready: true, running: false })).toBe(false); // stopped or crashed: start + probe again
+  expect(canSkipStart({ ready: false, running: true })).toBe(false); // not yet confirmed unsealed
+  expect(canSkipStart({ ready: false, running: false })).toBe(false);
 });

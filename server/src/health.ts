@@ -62,3 +62,10 @@ export async function startAndProbe(opts: StartAndProbeOptions): Promise<boolean
   if (remaining <= 0) return false;
   return waitForReady(opts.probe, { timeoutMs: remaining, intervalMs: opts.intervalMs, now: opts.now, sleep: opts.sleep });
 }
+
+// A request may go straight to OpenBao only when it was confirmed ready since the
+// container last started and the container is still running. Otherwise run the
+// start + readiness path (which also re-supplies the env vars).
+export function canSkipStart(state: { ready: boolean; running: boolean }): boolean {
+  return state.ready && state.running;
+}

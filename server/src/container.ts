@@ -1,5 +1,5 @@
 import { Container } from "@cloudflare/containers";
-import { startAndProbe, statusAndDrain } from "./health";
+import { canSkipStart, startAndProbe, statusAndDrain } from "./health";
 import type { Env } from "./env";
 
 export class OpenBao extends Container<Env> {
@@ -14,6 +14,11 @@ export class OpenBao extends Container<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    // Fast path: skip the library's per-request port ping and state write, which cost a
+    // round trip to the container and serialise concurrent requests.
+    if (canSkipStart({ ready: this.ready, running: this.ctx.container?.running === true })) {
+      return this.containerFetch(request);
+    }
     const budgetMs = 30_000;
     const started = await startAndProbe({
       budgetMs,
@@ -28,11 +33,7 @@ export class OpenBao extends Container<Env> {
           },
           cancellationOptions: { portReadyTimeoutMS: timeoutMs },
         }),
-      // After the first success the readiness probe is skipped, but start still runs every request.
-      probe: () =>
-        this.ready
-          ? Promise.resolve(200)
-          : this.containerFetch("http://openbao/v1/sys/health").then(statusAndDrain),
+      probe: () => this.containerFetch("http://openbao/v1/sys/health").then(statusAndDrain),
       onStartError: (err) =>
         console.warn(`container start failed: ${err instanceof Error ? `${err.name}: ${err.message}` : "unknown"}`),
     });
