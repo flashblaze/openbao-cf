@@ -24,7 +24,7 @@ Cloudflare account ID: `bfa55805fd87330adc70a36c2fc285f2` (export as `CLOUDFLARE
 
 ```bash
 secrets login --server https://bao.flashblaze.dev   # once per machine (prints a token: run in your own terminal)
-cd <project with .secrets.json>                     # {"project":"<name>"}
+cd <project>; secrets init                          # once per repo/app: writes .secrets.json (e.g. instaclock/api)
 secrets push            # upload ./.dev.vars (shows key names, asks to confirm)
 secrets run -- wrangler dev
 secrets pull            # write .dev.vars instead (refuses to overwrite without --force)

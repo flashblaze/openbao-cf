@@ -86,8 +86,9 @@ export async function connect(server: string, accessJwt: string, opts: Opts): Pr
   const token = login?.auth?.client_token;
   if (typeof token !== "string" || !token) throw new BaoError(200, "OpenBao login returned no token");
 
-  const secretPath = (project: string, env: string) =>
-    `/v1/secret/data/${encodeURIComponent(project)}/${encodeURIComponent(env)}`;
+  // Nested projects (`instaclock/api`) keep their slashes; each segment is encoded on its own.
+  const projectPath = (project: string) => project.split("/").map(encodeURIComponent).join("/");
+  const secretPath = (project: string, env: string) => `/v1/secret/data/${projectPath(project)}/${encodeURIComponent(env)}`;
   return {
     token,
     async readSecret(project, env) {
@@ -98,17 +99,19 @@ export async function connect(server: string, accessJwt: string, opts: Opts): Pr
       await request("POST", secretPath(project, env), { data }, token);
     },
     async listEnvs(project) {
-      const body = await request("GET", `/v1/secret/metadata/${encodeURIComponent(project)}/?list=true`, undefined, token, true);
+      const body = await request("GET", `/v1/secret/metadata/${projectPath(project)}/?list=true`, undefined, token, true);
       const keys: unknown = body?.data?.keys;
       if (!Array.isArray(keys)) return [];
       return keys.filter((k): k is string => typeof k === "string" && !k.endsWith("/")).sort();
     },
     async readLegacy(project) {
-      const body = await request("GET", `/v1/secret/data/${encodeURIComponent(project)}`, undefined, token, true);
+      // Pre-environment data can only exist for single-segment names; nested names came later.
+      if (project.includes("/")) return null;
+      const body = await request("GET", `/v1/secret/data/${projectPath(project)}`, undefined, token, true);
       return body === null ? null : (body?.data?.data ?? null);
     },
     async deleteLegacy(project) {
-      await request("DELETE", `/v1/secret/metadata/${encodeURIComponent(project)}`, undefined, token);
+      await request("DELETE", `/v1/secret/metadata/${projectPath(project)}`, undefined, token);
     },
   };
 }

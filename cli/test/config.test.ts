@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { devVarsFileFor, findProject, normalizeServer, readUserConfig, userConfigPath, validateEnvName, validateProjectName, writeUserConfig } from "../src/config.ts";
+import { devVarsFileFor, findProject, normalizeServer, readUserConfig, suggestProjectName, userConfigPath, validateEnvName, validateProjectName, writeUserConfig } from "../src/config.ts";
 
 let dir: string;
 beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), "secrets-cfg-")); });
@@ -25,7 +25,7 @@ test("throws naming the file on invalid JSON or name", async () => {
 test("accepts valid project names", () => {
   for (const n of ["a", "my-app", "a_b", "0x", "x".repeat(64)]) expect(validateProjectName(n)).toBe(true);
 });
-test.each(["../x", "A", "", "a/b", "x".repeat(65)])("rejects project name %p", (n) => expect(validateProjectName(n)).toBe(false));
+test.each(["../x", "A", "", "a b", "x".repeat(65)])("rejects project name %p", (n) => expect(validateProjectName(n)).toBe(false));
 test("normalizeServer", () => {
   expect(normalizeServer("https://bao.example.com/")).toBe("https://bao.example.com");
   expect(normalizeServer("https://bao.example.com/some/path")).toBe("https://bao.example.com");
@@ -73,4 +73,21 @@ test("devVarsFileFor maps the default env to .dev.vars", () => {
   expect(devVarsFileFor(p, "staging")).toBe("/r/.dev.vars.staging");
   expect(devVarsFileFor({ ...p, defaultEnv: "local" }, "local")).toBe("/r/.dev.vars");
   expect(devVarsFileFor({ ...p, defaultEnv: "local" }, "dev")).toBe("/r/.dev.vars.dev");
+});
+
+test("accepts nested project names", () => {
+  for (const n of ["instaclock/api", "a/b", "org/app/web/x", "my_app/api-v2"]) expect(validateProjectName(n)).toBe(true);
+});
+test.each(["a//b", "/a", "a/", "Ab/c", "a/B", "a/b/c/d/e", `a/${"x".repeat(65)}`, "a/../b"])("rejects nested name %p", (n) =>
+  expect(validateProjectName(n)).toBe(false));
+test("findProject accepts a nested project name", async () => {
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "instaclock/api" }));
+  expect((await findProject(dir))?.name).toBe("instaclock/api");
+});
+test("suggestProjectName: <repo>/<folder> inside a repo, <repo> at its root, folder outside git", () => {
+  expect(suggestProjectName("/w/instaclock", "/w/instaclock/apps/api")).toBe("instaclock/api");
+  expect(suggestProjectName("/w/instaclock", "/w/instaclock")).toBe("instaclock");
+  expect(suggestProjectName(null, "/w/My Worker")).toBe("my-worker");
+  expect(suggestProjectName("/w/Insta.Clock", "/w/Insta.Clock/apps/Web App")).toBe("insta-clock/web-app");
+  expect(suggestProjectName(null, "/w/___")).toBe("project");
 });

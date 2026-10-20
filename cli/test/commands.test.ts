@@ -3,6 +3,7 @@ import { mkdtemp, readFile, stat, writeFile, rm, access } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { envs } from "../src/commands/envs.ts";
+import { init } from "../src/commands/init.ts";
 import { login } from "../src/commands/login.ts";
 import { migrate } from "../src/commands/migrate.ts";
 import { proxy } from "../src/commands/proxy.ts";
@@ -480,4 +481,75 @@ test("main: --version prints the build version (dev when unset)", async () => {
   outBuf = "";
   expect(await main(["-v"], io)).toBe(0);
   expect(outBuf).toBe("secrets dev\n");
+});
+
+test("run on a nested project reads <project>/<env> and skips the legacy check", async () => {
+  await setup([LOGIN, NOT_FOUND]);
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "instaclock/api" }));
+  expect(await run(["--", "true"], io)).toBe(1);
+  expect(fake.requests.map((r) => r.path)).toEqual(["/v1/auth/jwt/login", "/v1/secret/data/instaclock/api/dev"]);
+  expect(errBuf).toContain("No secrets stored for project instaclock/api (dev).");
+});
+
+// init: a git stub that reports `root` as the repo top-level and whether .dev.vars is ignored.
+function gitStub(root: string | null, ignored = true) {
+  return async (cmd: string[]) => {
+    if (cmd.includes("rev-parse")) return root ? { code: 0, stdout: `${root}\n`, stderr: "" } : { code: 128, stdout: "", stderr: "not a git repo" };
+    if (cmd.includes("check-ignore")) return { code: ignored ? 0 : 1, stdout: "", stderr: "" };
+    return { code: 0, stdout: "", stderr: "" };
+  };
+}
+async function initDir(sub: string) {
+  const { mkdir } = await import("node:fs/promises");
+  await rm(join(dir, ".secrets.json"));
+  const cwd = join(dir, sub);
+  await mkdir(cwd, { recursive: true });
+  io.cwd = cwd;
+  return cwd;
+}
+
+test("init suggests <repo>/<folder> and writes .secrets.json", async () => {
+  await setup([]);
+  const repo = join(dir, "instaclock");
+  const cwd = await initDir("instaclock/apps/api");
+  io.run = gitStub(repo);
+  expect(await init([], io)).toBe(0);
+  expect(JSON.parse(await readFile(join(cwd, ".secrets.json"), "utf8"))).toEqual({ project: "instaclock/api" });
+  expect(outBuf).toContain("instaclock/api");
+  expect(fake.requests.length).toBe(0);
+});
+
+test("init --project and --env are written as given", async () => {
+  await setup([]);
+  const cwd = await initDir("svc");
+  io.run = gitStub(null);
+  expect(await init(["--project", "acme/billing", "--env", "local"], io)).toBe(0);
+  expect(JSON.parse(await readFile(join(cwd, ".secrets.json"), "utf8"))).toEqual({ project: "acme/billing", defaultEnv: "local" });
+});
+
+test("init refuses to overwrite without --force", async () => {
+  await setup([]);
+  io.run = gitStub(null);
+  await writeFile(join(dir, ".secrets.json"), JSON.stringify({ project: "keep" }));
+  expect(await init(["--project", "other"], io)).toBe(1);
+  expect(JSON.parse(await readFile(join(dir, ".secrets.json"), "utf8"))).toEqual({ project: "keep" });
+  expect(await init(["--project", "other", "--force"], io)).toBe(0);
+  expect(JSON.parse(await readFile(join(dir, ".secrets.json"), "utf8"))).toEqual({ project: "other" });
+});
+
+test("init rejects invalid names as usage errors", async () => {
+  await setup([]);
+  await initDir("x");
+  io.run = gitStub(null);
+  expect(await init(["--project", "Bad/Name"], io)).toBe(2);
+  expect(errBuf).toContain("Bad/Name");
+  expect(await init(["--env", "Prod!"], io)).toBe(2);
+});
+
+test("init warns when .dev.vars is not gitignored", async () => {
+  await setup([]);
+  await initDir("app");
+  io.run = gitStub(dir, false);
+  expect(await init([], io)).toBe(0);
+  expect(errBuf).toContain(".dev.vars is not gitignored");
 });

@@ -74,6 +74,20 @@ MIG=$(curl -sf -H "X-Vault-Token: $ROOT" http://127.0.0.1:8200/v1/secret/data/le
 [ "$MIG" = '{"OLD":"v1","OTHER":"v2"}' ] || fail "migrated data mismatch: $MIG"
 OUT=$("$SECRETS" run -- sh -c 'printf %s "$OLD"')
 [ "$OUT" = v1 ] || fail "run after migrate got: $OUT"
+
+echo "== nested project via init (real OpenBao)"
+mkdir -p "$TMP/acme/apps/api" && git -C "$TMP/acme" init -q
+cd "$TMP/acme/apps/api"
+"$SECRETS" init 2>/dev/null
+[ "$(jq -r .project .secrets.json)" = acme/api ] || fail "init suggested: $(cat .secrets.json)"
+printf 'NESTED=yes\n' > .dev.vars
+"$SECRETS" push --yes
+rm .dev.vars
+OUT=$("$SECRETS" run -- sh -c 'printf %s "$NESTED"')
+[ "$OUT" = yes ] || fail "nested run got: $OUT"
+[ "$("$SECRETS" envs)" = "* dev" ] || fail "nested envs: $("$SECRETS" envs)"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "X-Vault-Token: $ROOT" http://127.0.0.1:8200/v1/secret/data/acme/api/dev)
+[ "$code" = 200 ] || fail "nested secret not at secret/acme/api/dev (HTTP $code)"
 cd "$REPO/server"
 
 echo "== backup + restore drill"

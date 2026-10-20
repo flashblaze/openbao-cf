@@ -68,6 +68,20 @@ test("deleteLegacy deletes the metadata of secret/<project> only", async () => {
   expect(fake.requests[1].method).toBe("DELETE");
   expect(fake.requests[1].path).toBe("/v1/secret/metadata/demo");
 });
+test("nested project paths keep their slashes and encode each segment", async () => {
+  start(LOGIN, { status: 404, body: { errors: [] } }, { status: 404, body: { errors: [] } });
+  const c = await connect(fake.url, "J", opts());
+  await c.readSecret("instaclock/api", "dev");
+  await c.listEnvs("instaclock/api");
+  expect(fake.requests[1].path).toBe("/v1/secret/data/instaclock/api/dev");
+  expect(fake.requests[2].path).toBe("/v1/secret/metadata/instaclock/api/");
+});
+test("readLegacy for a nested project returns null without a request", async () => {
+  start(LOGIN);
+  const c = await connect(fake.url, "J", opts());
+  expect(await c.readLegacy("instaclock/api")).toBeNull();
+  expect(fake.requests.length).toBe(1);
+});
 test("302 → AccessDeniedError", async () => {
   start({ status: 302, headers: { location: "https://t.cloudflareaccess.com/cdn-cgi/access/login" } });
   const err = await connect(fake.url, "J", opts()).catch((e) => e);

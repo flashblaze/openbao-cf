@@ -72,6 +72,7 @@ setting `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` so Wrangler picks them up.
 
 | Command | What it does |
 |---|---|
+| `secrets init [--project <name>] [--env <name>] [--force]` | Creates `.secrets.json` in the current folder. In a git repo it suggests `<repo>/<folder>`, for example `instaclock/api` in `instaclock/apps/api`. It contacts nothing, so commit the file with your code. |
 | `secrets login [--server <url>]` | Saves the server URL and opens the Access login in your browser. Under WSL, copy the printed URL. |
 | `secrets push [file] [--env <name>] [--yes]` | Uploads `.dev.vars` (or `.dev.vars.<env>` for a non-default environment, or `file`) as the environment's secrets. Shows which **key names** are added, changed or removed, then asks to confirm. |
 | `secrets run [--env <name>] -- <cmd...>` | Runs `<cmd>` with the environment's secrets as env vars. Passes through the exit code and Ctrl-C. |
@@ -81,8 +82,12 @@ setting `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` so Wrangler picks them up.
 | `secrets proxy [--login] -- <cmd...>` | Runs `<cmd>` with `BAO_ADDR` pointing at a local proxy that adds your Access token. With `--login`, also sets `BAO_TOKEN`. Use it with `bao`. |
 | `secrets --version` | Prints the installed version: the release tag, or `dev` for a local build. |
 
-- **Project name:** each project has a committed `.secrets.json`, `{"project": "my-worker"}`
-  (lowercase letters, digits, `-` and `_`). Commands find it by walking up from the current directory.
+- **Project name:** each project has a committed `.secrets.json`, `{"project": "my-worker"}`. Create
+  it with `secrets init`. Commands find it by walking up from the current directory.
+  - Names are lowercase letters, digits, `-` and `_`.
+  - Names can be nested up to 4 levels: `instaclock/api` and `instaclock/web` are stored under one
+    `instaclock/` folder (`secret/instaclock/api/<env>`).
+  - In a monorepo, give each app its own `.secrets.json`.
 - **Environments:** each project can hold several named sets of secrets, such as `dev`,
   `staging` or `pr-12`, stored at `secret/<project>/<env>`.
   - Commands use `dev` unless you pass `--env <name>`, or set `"defaultEnv"` in `.secrets.json`.

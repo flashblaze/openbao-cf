@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile, chmod } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { APP_NAME, DEFAULT_ENV, PROJECT_FILE } from "./name.ts";
 
 export type UserConfig = { server: string };
@@ -43,8 +43,27 @@ export async function writeUserConfig(cfg: UserConfig, path: string): Promise<vo
   await chmod(path, 0o600); // writeFile's mode only applies to new files
 }
 
+const SEGMENT = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+const MAX_SEGMENTS = 4;
+
+/** A project name is 1-4 `/`-separated segments (e.g. `instaclock/api`), stored at secret/<name>/<env>. */
 export function validateProjectName(name: string): boolean {
-  return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(name);
+  const parts = name.split("/");
+  return parts.length <= MAX_SEGMENTS && parts.every((p) => SEGMENT.test(p));
+}
+
+function toSegment(raw: string): string {
+  const s = raw.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^[-_]+/, "").replace(/-+$/, "").slice(0, 64);
+  return s || "project";
+}
+
+/** `<repo>/<folder>` inside a git repo (just `<repo>` at its root), else the folder's own name. */
+export function suggestProjectName(gitRoot: string | null, cwd: string): string {
+  const here = resolve(cwd);
+  if (!gitRoot) return toSegment(basename(here));
+  const root = resolve(gitRoot);
+  const repo = toSegment(basename(root));
+  return here === root ? repo : `${repo}/${toSegment(basename(here))}`;
 }
 
 export function validateEnvName(name: string): boolean {
@@ -75,7 +94,7 @@ export async function findProject(startDir: string): Promise<Project | null> {
       }
       const name = parsed?.project;
       if (typeof name !== "string" || !validateProjectName(name)) {
-        throw new ProjectConfigError(`${file} has an invalid "project" name (use lowercase letters, digits, "-" and "_", up to 64 chars)`);
+        throw new ProjectConfigError(`${file} has an invalid "project" name (1-4 parts separated by "/", each lowercase letters, digits, "-" and "_", up to 64 chars)`);
       }
       const defaultEnv = parsed?.defaultEnv ?? DEFAULT_ENV;
       if (typeof defaultEnv !== "string" || !validateEnvName(defaultEnv)) {

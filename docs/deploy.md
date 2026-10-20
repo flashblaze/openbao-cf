@@ -181,7 +181,7 @@ Release. It needs no extra secrets, because it uses the workflow's own token.
 
 ```bash
 cd my-worker
-echo '{"project":"my-worker"}' > .secrets.json && git add .secrets.json
+secrets init && git add .secrets.json   # suggests the name; monorepo apps get <repo>/<app>
 secrets push                 # from the machine that has .dev.vars
 rm .dev.vars                 # `run` refuses while a .dev.vars exists (Wrangler would ignore the injected env)
 secrets run -- wrangler dev
