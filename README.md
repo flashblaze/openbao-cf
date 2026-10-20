@@ -61,8 +61,10 @@ browser (UI) ──cookie──────────▶   │
 ```
 
 Your identity is checked three times: by Access at the edge, by the Worker, and by
-OpenBao's JWT auth method, which accepts the same Access token. The `secrets` CLI gets that
-token from `cf access token` (a wrapper around `cloudflared`). It logs in to OpenBao, reads
+OpenBao's JWT auth method, which accepts the same Access token. The `secrets` CLI reads that
+token from `cloudflared`'s local cache (`~/.cloudflared/<host>-<aud>-token`) while it has more than a
+minute left. Otherwise it falls back to `cf access token`, a wrapper around `cloudflared` that costs an
+extra network round trip. It logs in to OpenBao, reads
 `secret/<project>/<env>` (KV v2), and starts your command with the values in its environment,
 setting `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` so Wrangler picks them up.
 

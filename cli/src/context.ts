@@ -11,9 +11,9 @@ export class UsageError extends Error {
   }
 }
 
-export type Context = { server: string; project: Project; client(): Promise<BaoClient> };
+export type Context = { server: string; project: Project; client(accessJwt?: string): Promise<BaoClient> };
 
-export type ServerContext = { server: string; client(): Promise<BaoClient> };
+export type ServerContext = { server: string; client(accessJwt?: string): Promise<BaoClient> };
 
 export async function loadServerContext(io: Io): Promise<ServerContext> {
   const cfg = await readUserConfig(userConfigPath(io.env));
@@ -21,8 +21,9 @@ export async function loadServerContext(io: Io): Promise<ServerContext> {
   const server = cfg.server;
   return {
     server,
-    async client() {
-      const jwt = await getAccessToken(server, { env: io.env, run: io.run });
+    /** Pass `accessJwt` when the caller already fetched it, to avoid a second lookup. */
+    async client(accessJwt?: string) {
+      const jwt = accessJwt ?? (await getAccessToken(server, { env: io.env, run: io.run }));
       return connect(server, jwt, { fetch: io.fetch });
     },
   };

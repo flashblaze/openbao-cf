@@ -398,6 +398,19 @@ test(
   30_000,
 );
 
+test("proxy --login fetches the Access token once", async () => {
+  await setup([LOGIN, { status: 200, body: {} }]);
+  delete io.env.SECRETS_ACCESS_JWT;
+  let cfCalls = 0;
+  io.run = async (cmd) => {
+    if (cmd[0] === "cf") cfCalls++;
+    return { code: 0, stdout: "eyJa.bbb.ccc\n", stderr: "" };
+  };
+  expect(await proxy(["--login", "--", "sh", "-c", 'curl -sf "$BAO_ADDR/v1/sys/health" > out'], io)).toBe(0);
+  expect(cfCalls).toBe(1);
+  expect(fake.requests[0].body).toEqual({ role: "owner", jwt: "eyJa.bbb.ccc" });
+});
+
 test("proxy without a server config is a usage error", async () => {
   await setup([], { config: false });
   expect(await proxy(["--", "true"], io)).toBe(2);

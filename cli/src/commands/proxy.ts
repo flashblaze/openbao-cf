@@ -29,7 +29,7 @@ export function proxy(args: string[], io: Io): Promise<number> {
     const ctx = await loadServerContext(io);
     const jwt = await getAccessToken(ctx.server, { env: io.env, run: io.run });
     const env: Record<string, string> = {};
-    if (withLogin) env.BAO_TOKEN = (await ctx.client()).token;
+    if (withLogin) env.BAO_TOKEN = (await ctx.client(jwt)).token;
 
     const server = Bun.serve({
       hostname: "127.0.0.1",
