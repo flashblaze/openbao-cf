@@ -171,7 +171,7 @@ CI never holds your Worker secrets, because `cf deploy` without `--secrets-file`
    ```bash
    gh secret set CLOUDFLARE_API_TOKEN          # paste at the hidden prompt
    gh secret set CLOUDFLARE_ACCOUNT_ID --body <account id>
-   gh variable set BAO_HOSTNAME --body bao.example.com
+   gh secret set BAO_HOSTNAME --body bao.example.com   # a secret so it is masked in public logs
    gh variable set BAO_REGIONS --body APAC
    ```
 3. **Push to `main`, or run "Deploy" from the Actions tab.** The workflow ends by checking that

@@ -76,10 +76,9 @@ bunx cf deploy --secrets-file secrets.env --containers-rollout immediate
 
 - **`Test`** runs the server and CLI tests on every push and pull request. It uses no secrets.
 - **`Deploy`** runs on pushes to `main` that touch `server/**`, or on demand from the Actions tab. It tests, runs
-  `cf deploy`, then checks that Access still guards the hostname. The hostname is masked in logs, which matters
-  for a public repo.
-- **What CI holds:** the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets, plus the `BAO_HOSTNAME` and
-  `BAO_REGIONS` variables.
+  `cf deploy`, then checks that Access still guards the hostname.
+- **What CI holds:** the `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `BAO_HOSTNAME` secrets (the hostname is
+  a secret only so GitHub masks it in logs) and the `BAO_REGIONS` variable.
 - **Worker secrets stay on the Worker.** `cf deploy` without `--secrets-file` keeps them. To change one, deploy
   locally with `--secrets-file` as above.
 

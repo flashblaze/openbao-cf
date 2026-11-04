@@ -20,16 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CF_SEND_TELEMETRY: "false"
-      BAO_HOSTNAME: ${{ vars.BAO_HOSTNAME }}
+      # A secret, not a variable, so GitHub masks it everywhere (public repos have public logs).
+      BAO_HOSTNAME: ${{ secrets.BAO_HOSTNAME }}
       BAO_REGIONS: ${{ vars.BAO_REGIONS }}
     defaults:
       run:
         working-directory: server
     steps:
-      # Public repos have public logs: keep the hostname out of them.
-      - name: Mask the hostname in logs
-        working-directory: .
-        run: echo "::add-mask::$BAO_HOSTNAME"
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
