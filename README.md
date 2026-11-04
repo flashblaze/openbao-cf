@@ -132,7 +132,7 @@ server/                    Worker + container (deployed with `cf`)
 cli/                       the `secrets` CLI (Bun, TypeScript)
 docs/
   deploy.md                deploy your own instance, step by step
-  runbook.md               operating the flashblaze.dev instance
+  runbook.md               operating a deployed instance (backups, restore drill, releases)
   superpowers/             the design spec and implementation plan
 .github/workflows/         Test on every push, Deploy server changes on main, Release on v* tags
 ```
@@ -215,7 +215,7 @@ On top of a Workers Paid plan you already have:
 ## Docs
 
 - [docs/deploy.md](docs/deploy.md): deploy your own instance.
-- [docs/runbook.md](docs/runbook.md): day-to-day operation of the flashblaze.dev instance
+- [docs/runbook.md](docs/runbook.md): day-to-day operation of a deployed instance
   (backups, restore drill, root token recovery, redeploys).
 - [Design spec](docs/superpowers/specs/2026-10-19-openbao-cf-design.md) and
   [implementation plan](docs/superpowers/plans/2026-10-19-openbao-cf.md): the why behind each decision.

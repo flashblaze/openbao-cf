@@ -1,18 +1,22 @@
 import { bindings, defineConfig, defineContainer, exports, triggers } from "cf/config";
 import * as entrypoint from "./src/index.ts" with { type: "cf-worker" };
+import { parseRegions } from "./src/regions.ts";
 
 const hostname = process.env.BAO_HOSTNAME;
 if (!hostname) {
   throw new Error("BAO_HOSTNAME is required: set it to the public hostname for the OpenBao Worker, e.g. BAO_HOSTNAME=bao.example.com");
 }
 
+const regions = parseRegions(process.env.BAO_REGIONS);
+
 const container = defineContainer({
   name: "openbao",
   image: { dockerfile: "./container/Dockerfile" },
   instanceType: "lite",
   maxInstances: 1,
-  // Run next to the owner (India) and the Neon database (ap-southeast-1); unpinned, it landed in Newark.
-  constraints: { regions: ["APAC"] },
+  // BAO_REGIONS (e.g. "APAC") pins the container near you and your database. Unpinned, Cloudflare
+  // places it near the first request with a cached image, which can be another continent.
+  ...(regions ? { constraints: { regions } } : {}),
 });
 
 export default defineConfig({

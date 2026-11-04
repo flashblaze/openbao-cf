@@ -21,10 +21,15 @@ jobs:
     env:
       CF_SEND_TELEMETRY: "false"
       BAO_HOSTNAME: ${{ vars.BAO_HOSTNAME }}
+      BAO_REGIONS: ${{ vars.BAO_REGIONS }}
     defaults:
       run:
         working-directory: server
     steps:
+      # Public repos have public logs: keep the hostname out of them.
+      - name: Mask the hostname in logs
+        working-directory: .
+        run: echo "::add-mask::$BAO_HOSTNAME"
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
@@ -42,9 +47,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Access still guards the hostname
         run: |
+          # Don't echo the redirect URL: it names the Access team domain.
           out=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "https://$BAO_HOSTNAME/v1/sys/health")
-          echo "$out"
           case "$out" in
-            "302 https://"*".cloudflareaccess.com/"*) ;;
-            *) echo "expected a 302 to Cloudflare Access" >&2; exit 1 ;;
+            "302 https://"*".cloudflareaccess.com/"*) echo "OK: unauthenticated requests are redirected to Cloudflare Access" ;;
+            *) echo "expected a 302 to Cloudflare Access, got HTTP ${out%% *}" >&2; exit 1 ;;
           esac

@@ -5,3 +5,4 @@ server/secrets.env
 server/oidc.env
 *.key
 .dev.vars
+*.local.md

@@ -89,7 +89,7 @@ docker rm -f bao-check
 ## 4. Deploy
 
 ```bash
-export CLOUDFLARE_ACCOUNT_ID=<your account id> BAO_HOSTNAME=bao.example.com
+export CLOUDFLARE_ACCOUNT_ID=<your account id> BAO_HOSTNAME=bao.example.com BAO_REGIONS=APAC   # region nearest you and Neon
 bunx cf deploy --secrets-file secrets.env --containers-rollout immediate
 ```
 
@@ -100,6 +100,11 @@ This creates:
 - the daily backup cron.
 
 Any `cf` command run inside `server/` needs `BAO_HOSTNAME` set, because `cloudflare.config.ts` reads it.
+
+**Set `BAO_REGIONS`** to the Cloudflare region nearest you and your Neon database. The choices are
+`ENAM`, `WNAM`, `EEUR`, `WEUR`, `APAC`, `SAM`, `ME`, `OC` and `AFR`; a comma list is allowed. Unpinned,
+Cloudflare picks the location, which can be another continent: every request and query then pays that
+round trip.
 
 Check that only Access gets through:
 
@@ -167,6 +172,7 @@ CI never holds your Worker secrets, because `cf deploy` without `--secrets-file`
    gh secret set CLOUDFLARE_API_TOKEN          # paste at the hidden prompt
    gh secret set CLOUDFLARE_ACCOUNT_ID --body <account id>
    gh variable set BAO_HOSTNAME --body bao.example.com
+   gh variable set BAO_REGIONS --body APAC
    ```
 3. **Push to `main`, or run "Deploy" from the Actions tab.** The workflow ends by checking that
    the hostname still redirects to Access.
@@ -211,4 +217,5 @@ cf r2 objects list --bucket-name openbao-cf-backups --prefix backups/
 | `cf` fails with "BAO_HOSTNAME is required" | You ran `cf` inside `server/` without exporting `BAO_HOSTNAME`. |
 | OpenBao rejects your login for the `owner` role | `OWNER_EMAIL` doesn't exactly match your token's `email` claim (case matters). |
 | First command after a break takes about 10 s | The container is waking up. That's expected; it sleeps after 10 idle minutes. |
+| Everything is slow, even warm requests | Check where the container runs (`cf containers applications instances list --application-id <app id>`). If it's far from you or Neon, set `BAO_REGIONS` and redeploy. |
 | Container out of memory | Change `instanceType` in `cloudflare.config.ts` from `lite` to `basic` and redeploy. OpenBao idles at about 20 MiB. |
