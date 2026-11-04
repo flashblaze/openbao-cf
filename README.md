@@ -219,3 +219,8 @@ On top of a Workers Paid plan you already have:
   (backups, restore drill, root token recovery, redeploys).
 - [Design spec](docs/superpowers/specs/2026-10-19-openbao-cf-design.md) and
   [implementation plan](docs/superpowers/plans/2026-10-19-openbao-cf.md): the why behind each decision.
+
+## License
+
+[MIT](LICENSE). OpenBao itself is MPL-2.0; this repo only references its official Docker image and does not
+include its code.
