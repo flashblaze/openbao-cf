@@ -101,15 +101,21 @@ setting `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` so Wrangler picks them up.
   and unicode. A value that can't be written safely is refused rather than corrupted.
 - **Cold start:** the first command after a quiet spell waits about 10 s for the container.
   The CLI retries while it wakes.
+
 **Install or update** from GitHub Releases. There are builds for `linux-x64` (also WSL),
-`linux-arm64`, `darwin-arm64` and `darwin-x64`. The repo is private, so this needs `gh auth login` first.
+`linux-arm64`, `darwin-arm64` and `darwin-x64`. This downloads the latest build, checks it
+against the release's `SHA256SUMS`, and installs it as `~/.local/bin/secrets`:
 
 ```bash
-gh release download -R flashblaze/openbao-cf -p secrets-linux-x64 -O ~/.local/bin/secrets --clobber \
-  && chmod +x ~/.local/bin/secrets && secrets --version
+T=linux-x64   # or linux-arm64, darwin-arm64, darwin-x64
+U=https://github.com/flashblaze/openbao-cf/releases/latest/download
+(cd "$(mktemp -d)" && curl -fsSLO "$U/secrets-$T" \
+  && curl -fsSL "$U/SHA256SUMS" | grep " secrets-$T\$" | sha256sum -c \
+  && mkdir -p ~/.local/bin && install -m 0755 "secrets-$T" ~/.local/bin/secrets) && secrets --version
 ```
 
-Every release also includes a `SHA256SUMS` file. To build from source instead, run
+On macOS, replace `sha256sum -c` with `shasum -a 256 -c`. `~/.local/bin` must be on your `PATH`.
+To build from source instead, run
 `cd cli && bun install && bun run build`, which produces `dist/secrets` and reports its
 version as `dev`.
 
@@ -202,7 +208,7 @@ On top of a Workers Paid plan you already have:
 | Neon | free plan: 1 GB, 100 compute-hours/month, suspends after 5 min idle | $0 |
 | R2 backups | a few KB a day | $0 (free tier) |
 | Cloudflare Access | up to 50 users | $0 |
-| GitHub Actions (private repo) | a deploy takes under a minute | $0 (free minutes) |
+| GitHub Actions | a deploy takes under a minute | $0 (free for public repos; a private fork stays within the free minutes) |
 
 ## Status and limits
 
